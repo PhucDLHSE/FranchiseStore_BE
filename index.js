@@ -4,8 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
 
-const routes = require("./routes");
-
+const pool = require("./src/configs/database");
 const app = express();
 
 /* ================= MIDDLEWARE ================= */
@@ -13,12 +12,27 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan("dev"));
 
-/* ================= ROUTES ================= */
-app.use("/api", routes);
+/* ================= DEFINE ROUTES ================= */
+const userRoutes = require("./src/routes/userRoutes");
+const authRoutes = require("./src/routes/authRoutes");
+
+/* ================= USE ROUTES ================= */
+app.use("/api", userRoutes);
+app.use("/api", authRoutes);
+
+/* ================= DB CONNECTION ================= */
+(async () => {
+  try {
+    const conn = await pool.getConnection();
+    console.log("✅ MySQL connected");
+    conn.release();
+  } catch (err) {
+    console.error("❌ MySQL error:", err.message);
+  }
+})();
 
 /* ================= START SERVER ================= */
 const PORT = process.env.PORT || 3000;
-
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
