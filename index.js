@@ -6,6 +6,7 @@ const morgan = require("morgan");
 
 const pool = require("./src/configs/database");
 const app = express();
+const swaggerUi = require("swagger-ui-express");
 
 /* ================= MIDDLEWARE ================= */
 app.use(cors());
@@ -15,10 +16,13 @@ app.use(morgan("dev"));
 /* ================= DEFINE ROUTES ================= */
 const userRoutes = require("./src/routes/userRoutes");
 const authRoutes = require("./src/routes/authRoutes");
+const swaggerSpec = require("./src/configs/swagger");
 
 /* ================= USE ROUTES ================= */
 app.use("/api", userRoutes);
 app.use("/api", authRoutes);
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 
 /* ================= DB CONNECTION ================= */
 (async () => {
