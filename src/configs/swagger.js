@@ -29,7 +29,9 @@ const options = {
       }
     ]
   },
-  apis: ["./src/routes/*.js"]
+
+  // 👇 QUAN TRỌNG NHẤT
+  apis: ["./routes/*.js"] // nơi swagger đọc comment
 };
 
 module.exports = swaggerJSDoc(options);
