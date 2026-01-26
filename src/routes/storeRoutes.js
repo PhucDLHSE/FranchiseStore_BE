@@ -5,8 +5,6 @@ const storeController = require("../controllers/storeController");
 const { verifyToken } = require("../middlewares/authMiddleware");
 const { requireAdmin } = require("../middlewares/roleMiddleware");
 
-router.use(verifyToken, requireAdmin);
-
 /**
  * @swagger
  * tags:
@@ -43,8 +41,7 @@ router.get("/stores", storeController.getAll);
  *   get:
  *     summary: Get store by ID
  *     description: Get detail information of a store by its ID (ADMIN only)
- *     tags:
- *       - Store
+ *     tags: [Stores]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -112,7 +109,7 @@ router.get("/stores/:id", storeController.getById);
  *               address:
  *                 type: string
  */
-router.post("/stores", storeController.create);
+router.post("/stores", verifyToken, requireAdmin, storeController.create);
 
 /**
  * @swagger
@@ -138,7 +135,7 @@ router.post("/stores", storeController.create);
  *       200:
  *         description: Store updated
  */
-router.patch("/stores/:id", storeController.update);
+router.patch("/stores/:id", verifyToken, requireAdmin, storeController.update);
 
 /**
  * @swagger
@@ -158,6 +155,6 @@ router.patch("/stores/:id", storeController.update);
  *       200:
  *         description: Store deleted
  */
-router.delete("/stores/:id", storeController.delete);
+router.delete("/stores/:id", verifyToken, requireAdmin, storeController.delete);
 
 module.exports = router;
