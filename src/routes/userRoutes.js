@@ -5,6 +5,50 @@ const userController = require("../controllers/userController");
 const { verifyToken } = require("../middlewares/authMiddleware");
 const { requireAdmin } = require("../middlewares/roleMiddleware");
 
+
+/**
+ * @swagger
+ * /api/users:
+ *   get:
+ *     summary: Get all users
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of users
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       username:
+ *                         type: string
+ *                       role:
+ *                         type: string
+ *                         enum: [ADMIN, CK_STAFF, SC_COORDINATOR, FR_STAFF, MANAGER]
+ *                       store_id:
+ *                         type: integer
+ *                         nullable: true
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: ADMIN only
+ */
+router.get(
+  "/users",
+  verifyToken,
+  requireAdmin,
+  userController.getAllUsers
+);
+
 /**
  * @swagger
  * /users:
@@ -20,9 +64,13 @@ const { requireAdmin } = require("../middlewares/roleMiddleware");
  *           schema:
  *             type: object
  *             required:
+ *               - store_id
+ *               - role
+ *               - name 
  *               - username
  *               - password
- *               - role
+ *               - phone
+ *               - dob
  *             properties:
  *               username:
  *                 type: string

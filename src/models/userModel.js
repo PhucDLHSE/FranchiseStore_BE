@@ -14,6 +14,18 @@ exports.findByUsername = async (username) => {
 };
 
 /**
+ * Get all users
+ */
+exports.findAll = async () => {
+  const [rows] = await pool.query(`
+    SELECT 
+      id, store_id, role, name, username, phone, dob
+    FROM Users
+  `);
+  return rows;
+};
+
+/**
  * Find user by ID
  */
 exports.findById = async (id) => {

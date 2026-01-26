@@ -54,3 +54,20 @@ exports.createUser = async (req, res) => {
     });
   }
 };
+
+/**
+ * GET /api/users
+ * Admin only
+ */
+exports.getAllUsers = async (req, res) => {
+  try {
+    const users = await userModel.findAll();
+
+    res.json({
+      data: users
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};

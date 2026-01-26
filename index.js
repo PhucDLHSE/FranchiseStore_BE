@@ -14,14 +14,16 @@ app.use(express.json());
 app.use(morgan("dev"));
 
 /* ================= DEFINE ROUTES ================= */
+const swaggerSpec = require("./src/configs/swagger");
 const userRoutes = require("./src/routes/userRoutes");
 const authRoutes = require("./src/routes/authRoutes");
-const swaggerSpec = require("./src/configs/swagger");
+const storeRoutes = require("./src/routes/storeRoutes");
 
 /* ================= USE ROUTES ================= */
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use("/api", userRoutes);
 app.use("/api", authRoutes);
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use("/api", storeRoutes);
 
 
 /* ================= DB CONNECTION ================= */
