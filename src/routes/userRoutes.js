@@ -8,7 +8,7 @@ const { requireAdmin } = require("../middlewares/roleMiddleware");
 
 /**
  * @swagger
- * /api/users:
+ * /users:
  *   get:
  *     summary: Get all users
  *     tags: [Users]

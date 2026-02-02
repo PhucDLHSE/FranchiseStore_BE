@@ -88,12 +88,7 @@ router.get("/products/:id", productController.getById);
  *       400:
  *         description: Validation error
  */
-router.post(
-  "/products",
-  verifyToken,
-  requireManager,
-  productController.create
-);
+router.post("/products", verifyToken, requireManager, productController.create);
 
 /**
  * @swagger
@@ -136,12 +131,7 @@ router.post(
  *       404:
  *         description: Product not found
  */
-router.put(
-  "/products/:id",
-  verifyToken,
-  requireManager,
-  productController.update
-);
+router.put("/products/:id", verifyToken, requireManager, productController.update);
 
 /**
  * @swagger
@@ -163,11 +153,6 @@ router.put(
  *       404:
  *         description: Product not found
  */
-router.delete(
-  "/products/:id",
-  verifyToken,
-  requireManager,
-  productController.delete
-);
+router.delete("/products/:id", verifyToken, requireManager,productController.delete);
 
 module.exports = router;

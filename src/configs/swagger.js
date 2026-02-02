@@ -25,7 +25,6 @@ const options = {
         }
       },
 
-      // 👇 THÊM PHẦN NÀY
       schemas: {
         User: {
           type: "object",
@@ -65,7 +64,6 @@ const options = {
     ]
   },
 
-  // Swagger đọc comment từ routes
   apis: ["./src/routes/*.js"]
 };
 
