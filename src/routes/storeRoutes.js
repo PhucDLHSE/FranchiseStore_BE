@@ -14,7 +14,7 @@ const { requireAdmin } = require("../middlewares/roleMiddleware");
 
 /**
  * @swagger
- * /api/stores:
+ * /stores:
  *   get:
  *     summary: Get all stores
  *     tags: [Stores]
@@ -85,7 +85,7 @@ router.get("/stores/:id", storeController.getById);
 
 /**
  * @swagger
- * /api/stores:
+ * /stores:
  *   post:
  *     summary: Create a new store
  *     tags: [Stores]
@@ -113,7 +113,7 @@ router.post("/stores", verifyToken, requireAdmin, storeController.create);
 
 /**
  * @swagger
- * /api/stores/{id}:
+ * /stores/{id}:
  *   put:
  *     summary: Update store
  *     tags: [Stores]
@@ -139,7 +139,7 @@ router.patch("/stores/:id", verifyToken, requireAdmin, storeController.update);
 
 /**
  * @swagger
- * /api/stores/{id}:
+ * /stores/{id}:
  *   delete:
  *     summary: Delete store
  *     tags: [Stores]
