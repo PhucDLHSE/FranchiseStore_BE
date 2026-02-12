@@ -110,7 +110,7 @@ exports.getUserById = async (req, res) => {
 };
 
 /**
- * PATCH /api/users/:id/status
+ * PATCH /api/users/status/:id
  * Toggle active
  */
 exports.updateStatus = async (req, res) => {
