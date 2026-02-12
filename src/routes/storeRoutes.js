@@ -37,6 +37,22 @@ router.get("/stores", storeController.getAll);
 
 /**
  * @swagger
+ * /stores/me:
+ *   get:
+ *     summary: Get current user's store
+ *     tags: [Store]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Store information
+ *       400:
+ *         description: User not assigned to store
+ */
+router.get("/stores/me", verifyToken, storeController.getMyStore);
+
+/**
+ * @swagger
  * /stores/{id}:
  *   get:
  *     summary: Get store by ID

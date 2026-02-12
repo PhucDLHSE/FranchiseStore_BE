@@ -70,6 +70,40 @@ exports.getById = async (req, res) => {
 };
 
 /**
+ * GET /api/stores/me
+ */
+exports.getMyStore = async (req, res) => {
+  console.log("USER FROM TOKEN:", req.user);
+  console.log("store_id:", req.user.store_id);
+  try {
+    const { store_id } = req.user;
+    if (!store_id) {
+      return res.status(400).json({
+        message: "User is not assigned to any store"
+      });
+    }
+    const store = await storeModel.findById(store_id);
+
+    if (!store) {
+      return res.status(404).json({
+        message: "Store not found"
+      });
+    }
+
+    return res.status(200).json({
+      data: store
+    });
+
+  } catch (err) {
+    console.error("GET /stores/me error:", err);
+    return res.status(500).json({
+      message: "Server error"
+    });
+  }
+  
+};
+
+/**
  * PUT /api/stores/:id
  */
 exports.update = async (req, res) => {

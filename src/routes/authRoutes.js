@@ -33,6 +33,7 @@ const { requireAdmin } = require("../middlewares/roleMiddleware");
  *         content:
  *           application/json:
  *             schema:
+ * 
  *               type: object
  *               properties:
  *                 token:

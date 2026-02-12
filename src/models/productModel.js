@@ -67,7 +67,5 @@ exports.update = async (id, data) => {
  */
 exports.delete = async (id) => {
   await pool.query(
-    `UPDATE Product SET is_active = false WHERE id = ?`,
-    [id]
-  );
+    `UPDATE Product SET deleted_at = NOW() WHERE id = ?`, [id]);
 };
