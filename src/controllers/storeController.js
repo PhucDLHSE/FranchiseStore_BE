@@ -1,4 +1,6 @@
 const storeModel = require("../models/storeModel");
+const response = require("../utils/response");
+const ERROR = require("../utils/errorCodes");
 
 /**
  * POST /api/stores
@@ -7,35 +9,50 @@ const storeModel = require("../models/storeModel");
 exports.create = async (req, res) => {
   try {
     const { type, name, address } = req.body;
+    const userId = req.user?.id || null;
 
+    // Validate required fields
     if (!type || !name) {
-      return res.status(400).json({
-        message: "type và name là bắt buộc"
-      });
+      return response.error(
+        res,
+        ERROR.BAD_REQUEST,
+        "type và name là bắt buộc"
+      );
     }
 
+    // Validate ENUM type
     if (!["FR", "CK", "SC"].includes(type)) {
-      return res.status(400).json({
-        message: "type phải là FR | CK | SC"
-      });
+      return response.error(
+        res,
+        ERROR.BAD_REQUEST,
+        "type phải là FR | CK | SC"
+      );
     }
 
-    const storeId = await storeModel.create({ type, name, address });
+    const storeId = await storeModel.create({
+      type,
+      name,
+      address,
+      created_by: userId
+    });
 
-    res.status(201).json({
-      message: "Create store successfully",
-      data: {
+    return response.success(
+      res,
+      {
         id: storeId,
         type,
         name,
         address
-      }
-    });
+      },
+      "Create store successfully",
+      201
+    );
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error" });
+    return response.error(res, ERROR.INTERNAL_ERROR);
   }
 };
+
 
 /**
  * GET /api/stores
@@ -44,12 +61,13 @@ exports.create = async (req, res) => {
 exports.getAll = async (req, res) => {
   try {
     const stores = await storeModel.findAll();
-    res.json({ data: stores });
+    return response.success(res, stores);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error" });
+    return response.error(res, ERROR.INTERNAL_ERROR);
   }
 };
+
 
 /**
  * GET /api/stores/:id
@@ -59,49 +77,45 @@ exports.getById = async (req, res) => {
     const store = await storeModel.findById(req.params.id);
 
     if (!store) {
-      return res.status(404).json({ message: "Store not found" });
+      return response.error(res, ERROR.NOT_FOUND, "Store not found");
     }
 
-    res.json({ data: store });
+    return response.success(res, store);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error" });
+    return response.error(res, ERROR.INTERNAL_ERROR);
   }
 };
+
 
 /**
  * GET /api/stores/me
  */
 exports.getMyStore = async (req, res) => {
-  console.log("USER FROM TOKEN:", req.user);
-  console.log("store_id:", req.user.store_id);
   try {
     const { store_id } = req.user;
+
     if (!store_id) {
-      return res.status(400).json({
-        message: "User is not assigned to any store"
-      });
+      return response.error(
+        res,
+        ERROR.BAD_REQUEST,
+        "User is not assigned to any store"
+      );
     }
+
     const store = await storeModel.findById(store_id);
 
     if (!store) {
-      return res.status(404).json({
-        message: "Store not found"
-      });
+      return response.error(res, ERROR.NOT_FOUND, "Store not found");
     }
 
-    return res.status(200).json({
-      data: store
-    });
-
+    return response.success(res, store);
   } catch (err) {
-    console.error("GET /stores/me error:", err);
-    return res.status(500).json({
-      message: "Server error"
-    });
+    console.error(err);
+    return response.error(res, ERROR.INTERNAL_ERROR);
   }
-  
 };
+
 
 /**
  * PUT /api/stores/:id
@@ -110,24 +124,30 @@ exports.update = async (req, res) => {
   try {
     const storeId = req.params.id;
     const { name, address } = req.body;
+    const userId = req.user?.id || null;
+
+    if (!name && !address) {
+      return response.error(
+        res,
+        ERROR.BAD_REQUEST,
+        "No fields provided to update"
+      );
+    }
 
     const updated = await storeModel.updateById(storeId, {
       name,
-      address
+      address,
+      updated_by: userId
     });
 
     if (!updated) {
-      return res.status(400).json({
-        message: "No fields provided to update"
-      });
+      return response.error(res, ERROR.NOT_FOUND, "Store not found");
     }
 
-    return res.json({
-      message: "Store updated successfully"
-    });
+    return response.success(res, null, "Store updated successfully");
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error" });
+    return response.error(res, ERROR.INTERNAL_ERROR);
   }
 };
 
@@ -140,12 +160,12 @@ exports.delete = async (req, res) => {
     const affected = await storeModel.remove(req.params.id);
 
     if (affected === 0) {
-      return res.status(404).json({ message: "Store not found" });
+      return response.error(res, ERROR.NOT_FOUND, "Store not found");
     }
 
-    res.json({ message: "Delete store successfully" });
+    return response.success(res, null, "Delete store successfully");
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error" });
+    return response.error(res, ERROR.INTERNAL_ERROR);
   }
 };

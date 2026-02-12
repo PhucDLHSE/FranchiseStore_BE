@@ -4,39 +4,27 @@ const router = express.Router();
 const userController = require("../controllers/userController");
 const { verifyToken } = require("../middlewares/authMiddleware");
 const { requireAdmin } = require("../middlewares/roleMiddleware");
+const { requireRoles } = require("../middlewares/roleMiddleware");
 
+
+/**
+ * @swagger
+ * tags:
+ *   name: Users
+ *   description: User Management
+ */
 
 /**
  * @swagger
  * /users:
  *   get:
- *     summary: Get all users
+ *     summary: Get all users (ADMIN)
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: List of users
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: integer
- *                       username:
- *                         type: string
- *                       role:
- *                         type: string
- *                         enum: [ADMIN, CK_STAFF, SC_COORDINATOR, FR_STAFF, MANAGER]
- *                       store_id:
- *                         type: integer
- *                         nullable: true
  *       401:
  *         description: Unauthorized
  *       403:
@@ -49,6 +37,35 @@ router.get(
   userController.getAllUsers
 );
 
+
+/**
+ * @swagger
+ * /users/{id}:
+ *   get:
+ *     summary: Get user by ID (ADMIN)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: User detail
+ *       404:
+ *         description: User not found
+ */
+router.get(
+  "/users/:id",
+  verifyToken,
+  requireAdmin,
+  userController.getUserById
+);
+
+
 /**
  * @swagger
  * /users:
@@ -59,31 +76,9 @@ router.get(
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - store_id
- *               - role
- *               - name 
- *               - username
- *               - password
- *               - phone
- *               - dob
- *             properties:
- *               username:
- *                 type: string
- *               password:
- *                 type: string
- *               role:
- *                 type: string
- *                 enum: [ADMIN, MANAGER, FR_STAFF, CK_STAFF, SC_COORDINATOR]
  *     responses:
  *       201:
  *         description: User created
- *       403:
- *         description: Forbidden
  */
 router.post(
   "/users",
@@ -91,5 +86,57 @@ router.post(
   requireAdmin,
   userController.createUser
 );
+
+/**
+ * @swagger
+ * /users/{id}/status:
+ *   patch:
+ *     summary: Update user active status (ADMIN)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Status updated
+ */
+router.patch(
+  "/users/status/:id",
+  verifyToken,
+  requireAdmin,
+  userController.updateStatus
+);
+
+
+/**
+ * @swagger
+ * /users/{id}:
+ *   delete:
+ *     summary: Soft delete user (ADMIN)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: User deleted
+ */
+router.delete(
+  "/users/:id",
+  verifyToken,
+  requireAdmin,
+  userController.deleteUser
+);
+
 
 module.exports = router;

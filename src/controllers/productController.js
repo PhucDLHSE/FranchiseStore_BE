@@ -1,4 +1,6 @@
 const productModel = require("../models/productModel");
+const ERROR = require("../utils/errorCodes");
+const response = require("../utils/response");
 const { generateSKU } = require("../utils/skuGenerator");
 
 /**
@@ -6,10 +8,11 @@ const { generateSKU } = require("../utils/skuGenerator");
  */
 exports.getAll = async (req, res) => {
   try {
-    const data = await productModel.getAll();
-    res.json({ data });
+    const products = await productModel.findAll();
+    return response.success(res, products);
   } catch (err) {
-    res.status(500).json({ message: "Server error" });
+    console.error(err);
+    return response.error(res, ERROR.INTERNAL_ERROR);
   }
 };
 
@@ -18,13 +21,16 @@ exports.getAll = async (req, res) => {
  */
 exports.getById = async (req, res) => {
   try {
-    const product = await productModel.getById(req.params.id);
+    const product = await productModel.findById(req.params.id);
+
     if (!product) {
-      return res.status(404).json({ message: "Product not found" });
+      return response.error(res, ERROR.NOT_FOUND);
     }
-    res.json({ data: product });
+
+    return response.success(res, product);
   } catch (err) {
-    res.status(500).json({ message: "Server error" });
+    console.error(err);
+    return response.error(res, ERROR.INTERNAL_ERROR);
   }
 };
 
@@ -42,9 +48,7 @@ exports.create = async (req, res) => {
     } = req.body;
 
     if (!category_id || !name || !uom || !product_type) {
-      return res.status(400).json({
-        message: "Missing required fields"
-      });
+      return response.error(res, ERROR.BAD_REQUEST);
     }
 
     const sku = generateSKU({ name, product_type });
@@ -55,21 +59,24 @@ exports.create = async (req, res) => {
       image_url,
       sku,
       uom,
-      product_type
+      product_type,
+      created_by: req.user?.id
     });
 
-    res.status(201).json({
-      message: "Product created",
-      data: { id, sku }
-    });
+    return response.success(
+      res,
+      { id, sku },
+      "Product created",
+      201
+    );
   } catch (err) {
-    if (err.code === "ER_DUP_ENTRY") {
-      return res.status(400).json({
-        message: "Product SKU already exists"
-      });
-    }
     console.error(err);
-    res.status(500).json({ message: "Server error" });
+
+    if (err.code === "ER_DUP_ENTRY") {
+      return response.error(res, ERROR.CONFLICT);
+    }
+
+    return response.error(res, ERROR.INTERNAL_ERROR);
   }
 };
 
@@ -78,10 +85,26 @@ exports.create = async (req, res) => {
  */
 exports.update = async (req, res) => {
   try {
-    await productModel.update(req.params.id, req.body);
-    res.json({ message: "Product updated" });
+    const id = req.params.id;
+
+    const affected = await productModel.updateById(id, {
+      ...req.body,
+      updated_by: req.user?.id
+    });
+
+    if (!affected) {
+      return response.error(res, ERROR.NOT_FOUND);
+    }
+
+    return response.success(res, null, "Product updated");
   } catch (err) {
-    res.status(500).json({ message: "Server error" });
+    console.error(err);
+
+    if (err.code === "ER_DUP_ENTRY") {
+      return response.error(res, ERROR.CONFLICT);
+    }
+
+    return response.error(res, ERROR.INTERNAL_ERROR);
   }
 };
 
@@ -90,9 +113,20 @@ exports.update = async (req, res) => {
  */
 exports.delete = async (req, res) => {
   try {
-    await productModel.delete(req.params.id);
-    res.json({ message: "Product deleted" });
+    const id = req.params.id;
+
+    const affected = await productModel.softDelete(
+      id,
+      req.user?.id
+    );
+
+    if (!affected) {
+      return response.error(res, ERROR.NOT_FOUND);
+    }
+
+    return response.success(res, null, "Product deleted");
   } catch (err) {
-    res.status(500).json({ message: "Server error" });
+    console.error(err);
+    return response.error(res, ERROR.INTERNAL_ERROR);
   }
 };

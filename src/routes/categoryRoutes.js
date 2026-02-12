@@ -11,7 +11,7 @@ const { requireAdmin } = require("../middlewares/roleMiddleware");
  *   name: Category
  *   description: Category management
  */
-
+ 
 /**
  * @swagger
  * /categories:
@@ -68,12 +68,7 @@ router.get("/categories/:id", categoryController.getById);
  *       201:
  *         description: Category created
  */
-router.post(
-  "/categories",
-  verifyToken,
-  requireAdmin,
-  categoryController.create
-);
+router.post("/categories", verifyToken, requireAdmin, categoryController.create);
 
 /**
  * @swagger
@@ -103,12 +98,7 @@ router.post(
  *       200:
  *         description: Category updated
  */
-router.patch(
-  "/categories/:id",
-  verifyToken,
-  requireAdmin,
-  categoryController.update
-);
+router.patch("/categories/:id", verifyToken, requireAdmin, categoryController.update);
 
 /**
  * @swagger
@@ -128,11 +118,6 @@ router.patch(
  *       200:
  *         description: Category deleted
  */
-router.delete(
-  "/categories/:id",
-  verifyToken,
-  requireAdmin,
-  categoryController.delete
-);
+router.delete("/categories/:id", verifyToken, requireAdmin, categoryController.delete); 
 
 module.exports = router;

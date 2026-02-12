@@ -9,7 +9,7 @@ const { requireAdmin } = require("../middlewares/roleMiddleware");
  * @swagger
  * tags:
  *   name: Stores
- *   description: Store management (ADMIN)
+ *   description: Store Management (ADMIN)
  */
 
 /**

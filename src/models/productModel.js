@@ -1,41 +1,85 @@
 const pool = require("../configs/database");
 
 /**
- * Get all products
+ * Base select fields
  */
-exports.getAll = async () => {
-  const [rows] = await pool.query(
-    `SELECT p.*, c.name AS category_name
-     FROM Product p
-     JOIN Category c ON p.category_id = c.id
-     WHERE p.is_active = true`
-  );
+const BASE_SELECT = `
+  p.id,
+  p.category_id,
+  c.name AS category_name,
+  p.name,
+  p.sku,
+  p.image_url,
+  p.uom,
+  p.product_type,
+  p.is_active,
+  p.created_at,
+  p.updated_at,
+  p.created_by,
+  p.updated_by
+`;
+
+/**
+ * Get all active products (not soft deleted)
+ */
+exports.findAll = async () => {
+  const sql = `
+    SELECT ${BASE_SELECT}
+    FROM Product p
+    JOIN Category c ON p.category_id = c.id
+    WHERE p.deleted_at IS NULL
+    ORDER BY p.id DESC
+  `;
+
+  const [rows] = await pool.query(sql);
   return rows;
 };
 
 /**
- * Get product by ID
+ * Get product by id
  */
-exports.getById = async (id) => {
-  const [rows] = await pool.query(
-    `SELECT * FROM Product WHERE id = ? AND is_active = true`,
-    [id]
-  );
-  return rows[0];
+exports.findById = async (id) => {
+  const sql = `
+    SELECT ${BASE_SELECT}
+    FROM Product p
+    JOIN Category c ON p.category_id = c.id
+    WHERE p.id = ?
+      AND p.deleted_at IS NULL
+  `;
+
+  const [rows] = await pool.query(sql, [id]);
+  return rows[0] || null;
 };
 
 /**
  * Create product
  */
-exports.create = async (data) => {
-  const { category_id, name, sku, uom, product_type } = data;
+exports.create = async ({
+  category_id,
+  name,
+  sku,
+  image_url,
+  uom,
+  product_type,
+  is_active = true,
+  created_by
+}) => {
+  const sql = `
+    INSERT INTO Product
+    (category_id, name, sku, image_url, uom, product_type, is_active, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `;
 
-  const [result] = await pool.query(
-    `INSERT INTO Product
-     (category_id, name, sku, uom, product_type)
-     VALUES (?, ?, ?, ?, ?)`,
-    [category_id, name, sku, uom, product_type]
-  );
+  const [result] = await pool.query(sql, [
+    category_id,
+    name,
+    sku || null,
+    image_url || null,
+    uom,
+    product_type,
+    is_active,
+    created_by || null
+  ]);
 
   return result.insertId;
 };
@@ -43,29 +87,57 @@ exports.create = async (data) => {
 /**
  * Update product (partial update)
  */
-exports.update = async (id, data) => {
+exports.updateById = async (id, data) => {
+  const allowedFields = [
+    "category_id",
+    "name",
+    "sku",
+    "image_url",
+    "uom",
+    "product_type",
+    "is_active",
+    "updated_by"
+  ];
+
   const fields = [];
   const values = [];
 
-  Object.entries(data).forEach(([key, value]) => {
-    fields.push(`${key} = ?`);
-    values.push(value);
-  });
+  for (const key of allowedFields) {
+    if (data[key] !== undefined) {
+      fields.push(`${key} = ?`);
+      values.push(data[key]);
+    }
+  }
 
-  if (fields.length === 0) return;
+  if (fields.length === 0) {
+    return 0;
+  }
 
   values.push(id);
 
-  await pool.query(
-    `UPDATE Product SET ${fields.join(", ")} WHERE id = ?`,
-    values
-  );
+  const sql = `
+    UPDATE Product
+    SET ${fields.join(", ")}
+    WHERE id = ?
+      AND deleted_at IS NULL
+  `;
+
+  const [result] = await pool.query(sql, values);
+  return result.affectedRows;
 };
 
 /**
  * Soft delete product
  */
-exports.delete = async (id) => {
-  await pool.query(
-    `UPDATE Product SET deleted_at = NOW() WHERE id = ?`, [id]);
+exports.softDelete = async (id, deleted_by) => {
+  const sql = `
+    UPDATE Product
+    SET deleted_at = NOW(),
+        deleted_by = ?
+    WHERE id = ?
+      AND deleted_at IS NULL
+  `;
+
+  const [result] = await pool.query(sql, [deleted_by || null, id]);
+  return result.affectedRows;
 };

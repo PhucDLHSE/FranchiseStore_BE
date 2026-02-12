@@ -1,4 +1,7 @@
 const categoryModel = require("../models/categoryModel");
+const response = require("../utils/response");
+const ERROR = require("../utils/errorCodes");
+
 
 /**
  * GET /api/categories
@@ -6,12 +9,13 @@ const categoryModel = require("../models/categoryModel");
 exports.getAll = async (req, res) => {
   try {
     const data = await categoryModel.findAll();
-    res.json({ data });
+    return response.success(res, data);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error" });
+    return response.error(res, ERROR.INTERNAL_ERROR);
   }
 };
+
 
 /**
  * GET /api/categories/:id
@@ -21,15 +25,17 @@ exports.getById = async (req, res) => {
     const category = await categoryModel.findById(req.params.id);
 
     if (!category) {
-      return res.status(404).json({ message: "Category not found" });
+      return response.error(res, ERROR.NOT_FOUND, "Category not found");
     }
 
-    res.json({ data: category });
+    return response.success(res, category);
+
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error" });
+    return response.error(res, ERROR.INTERNAL_ERROR);
   }
 };
+
 
 /**
  * POST /api/categories (ADMIN)
@@ -39,50 +45,90 @@ exports.create = async (req, res) => {
     const { name, description } = req.body;
 
     if (!name) {
-      return res.status(400).json({ message: "Name is required" });
+      return response.error(res, ERROR.BAD_REQUEST, "Name is required");
+    }
+
+    const existing = await categoryModel.findByName(name);
+
+    if (existing) {
+      return response.error(
+        res,
+        ERROR.CONFLICT,
+        "Category name already exists"
+      );
     }
 
     const id = await categoryModel.create({ name, description });
 
-    res.status(201).json({
-      message: "Category created",
-      data: { id, name, description }
-    });
+    return response.success(
+      res,
+      { id, name, description },
+      "Category created",
+      201
+    );
+
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error" });
+    return response.error(res, ERROR.INTERNAL_ERROR);
   }
 };
+
 
 /**
  * PUT /api/categories/:id (ADMIN)
  */
 exports.update = async (req, res) => {
   try {
-    const updated = await categoryModel.update(req.params.id, req.body);
+    const id = req.params.id;
 
-    if (!updated) {
-      return res.status(400).json({
-        message: "No fields to update"
-      });
+    const existing = await categoryModel.findById(id);
+
+    if (!existing) {
+      return response.error(res, ERROR.NOT_FOUND, "Category not found");
     }
 
-    res.json({ message: "Category updated" });
+    // Nếu đổi name → check duplicate
+    if (req.body.name) {
+      const duplicate = await categoryModel.findByName(req.body.name);
+      if (duplicate && duplicate.id != id) {
+        return response.error(
+          res,
+          ERROR.CONFLICT,
+          "Category name already exists"
+        );
+      }
+    }
+
+    const updated = await categoryModel.update(id, req.body);
+
+    if (!updated) {
+      return response.error(res, ERROR.BAD_REQUEST, "No fields to update");
+    }
+
+    return response.success(res, null, "Category updated");
+
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error" });
+    return response.error(res, ERROR.INTERNAL_ERROR);
   }
 };
+
 
 /**
  * DELETE /api/categories/:id (ADMIN)
  */
 exports.delete = async (req, res) => {
   try {
-    await categoryModel.delete(req.params.id);
-    res.json({ message: "Category deleted" });
+    const deleted = await categoryModel.softDelete(req.params.id);
+
+    if (!deleted) {
+      return response.error(res, ERROR.NOT_FOUND, "Category not found");
+    }
+
+    return response.success(res, null, "Category deleted");
+
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error" });
+    return response.error(res, ERROR.INTERNAL_ERROR);
   }
 };
