@@ -89,7 +89,7 @@ router.post(
 
 /**
  * @swagger
- * /users/{id}/status:
+ * /users/status/{id}:
  *   patch:
  *     summary: Update user active status (ADMIN)
  *     tags: [Users]
