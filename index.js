@@ -20,6 +20,7 @@ const authRoutes = require("./src/routes/authRoutes");
 const storeRoutes = require("./src/routes/storeRoutes");
 const categoryRoutes = require("./src/routes/categoryRoutes");
 const productRoutes = require("./src/routes/productRoutes");
+const orderRoutes = require("./src/routes/orderRoutes");
 
 /* ================= USE ROUTES ================= */
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
@@ -28,6 +29,7 @@ app.use("/api", authRoutes);
 app.use("/api", storeRoutes);
 app.use("/api", categoryRoutes);
 app.use("/api", productRoutes);
+app.use("/api", orderRoutes);
 
 
 /* ================= DB CONNECTION ================= */
