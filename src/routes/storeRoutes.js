@@ -40,7 +40,7 @@ router.get("/stores", storeController.getAll);
  * /stores/me:
  *   get:
  *     summary: Get current user's store
- *     tags: [Store]
+ *     tags: [Stores]
  *     security:
  *       - bearerAuth: []
  *     responses:

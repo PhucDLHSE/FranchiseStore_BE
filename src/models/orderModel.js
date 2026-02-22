@@ -94,3 +94,35 @@ exports.getOrderById = async (orderId) => {
   return rows;
 };
 
+/**
+ * Get All Orders
+ */
+exports.getAllOrders = async (role, storeId) => {
+  let query = `
+    SELECT 
+      o.id,
+      o.order_code,
+      o.store_id,
+      o.order_date,
+      o.delivery_date,
+      o.status,
+      o.total_amount,
+      o.created_at
+    FROM Orders o
+  `;
+
+  const params = [];
+
+  // 🔒 Nếu là FR_STAFF → chỉ xem store mình
+  if (role === "FR_STAFF") {
+    query += ` WHERE o.store_id = ?`;
+    params.push(storeId);
+  }
+
+  query += ` ORDER BY o.created_at DESC`;
+
+  const [rows] = await pool.query(query, params);
+
+  return rows;
+};
+
