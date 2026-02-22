@@ -126,3 +126,20 @@ exports.getAllOrders = async (role, storeId) => {
   return rows;
 };
 
+/**
+ * Auto cancel orders after 2 days if still SUBMITTED
+ */
+exports.autoCancelExpiredOrders = async () => {
+  const [result] = await pool.query(
+    `
+    UPDATE Orders
+    SET status = 'CANCELLED',
+        updated_at = NOW()
+    WHERE status = 'SUBMITTED'
+      AND created_at <= NOW() - INTERVAL 2 DAY
+    `
+  );
+
+  return result.affectedRows;
+};
+

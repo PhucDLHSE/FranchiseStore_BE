@@ -21,6 +21,8 @@ const storeRoutes = require("./src/routes/storeRoutes");
 const categoryRoutes = require("./src/routes/categoryRoutes");
 const productRoutes = require("./src/routes/productRoutes");
 const orderRoutes = require("./src/routes/orderRoutes");
+const startAutoCancelJob = require("./src/services/autoCancelJob");
+
 
 /* ================= USE ROUTES ================= */
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
@@ -48,3 +50,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+
+startAutoCancelJob();
