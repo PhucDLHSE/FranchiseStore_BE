@@ -9,7 +9,7 @@ const { requireManager } = require("../middlewares/roleMiddleware");
  * @swagger
  * tags:
  *   name: Product
- *   description: Product Management
+ *   description: Product Management (MANAGER)
  */
 
 /**

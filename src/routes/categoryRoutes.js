@@ -3,15 +3,15 @@ const router = express.Router();
 
 const categoryController = require("../controllers/categoryController");
 const { verifyToken } = require("../middlewares/authMiddleware");
-const { requireAdmin } = require("../middlewares/roleMiddleware");
+const { requireManager } = require("../middlewares/roleMiddleware");
 
 /**
  * @swagger
  * tags:
  *   name: Category
- *   description: Category management
+ *   description: Category management (MANAGER)
  */
- 
+
 /**
  * @swagger
  * /categories:
@@ -68,13 +68,13 @@ router.get("/categories/:id", categoryController.getById);
  *       201:
  *         description: Category created
  */
-router.post("/categories", verifyToken, requireAdmin, categoryController.create);
+router.post("/categories", verifyToken, requireManager, categoryController.create);
 
 /**
  * @swagger
  * /categories/{id}:
  *   patch:
- *     summary: Update category (ADMIN)
+ *     summary: Update category (MANAGER)
  *     tags: [Category]
  *     security:
  *       - bearerAuth: []
@@ -98,13 +98,13 @@ router.post("/categories", verifyToken, requireAdmin, categoryController.create)
  *       200:
  *         description: Category updated
  */
-router.patch("/categories/:id", verifyToken, requireAdmin, categoryController.update);
+router.patch("/categories/:id", verifyToken, requireManager, categoryController.update);
 
 /**
  * @swagger
  * /categories/{id}:
  *   delete:
- *     summary: Delete category (ADMIN)
+ *     summary: Delete category (MANAGER)
  *     tags: [Category]
  *     security:
  *       - bearerAuth: []
@@ -118,6 +118,6 @@ router.patch("/categories/:id", verifyToken, requireAdmin, categoryController.up
  *       200:
  *         description: Category deleted
  */
-router.delete("/categories/:id", verifyToken, requireAdmin, categoryController.delete); 
+router.delete("/categories/:id", verifyToken, requireManager, categoryController.delete); 
 
 module.exports = router;
