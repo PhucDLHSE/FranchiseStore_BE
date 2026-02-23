@@ -395,4 +395,131 @@ router.get(
   orderController.getOrderDetail
 );
 
+/**
+ * @swagger
+ * /orders/{id}/confirm:
+ *   patch:
+ *     summary: Confirm an order
+ *     description: CK_STAFF confirms an order. Transition SUBMITTED -> CONFIRMED.
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Order ID
+ *     responses:
+ *       200:
+ *         description: Order confirmed successfully
+ *       400:
+ *         description: Invalid request / validation error
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Only CK_STAFF can confirm
+ *       404:
+ *         description: Order not found
+ *       500:
+ *         description: Internal server error
+ */
+router.patch(
+  "/orders/:id/confirm",
+  verifyToken,
+  requireCKStaff,
+  orderController.confirmOrder
+);
+
+/**
+ * @swagger
+ * /orders/{id}/issue:
+ *   patch:
+ *     summary: Issue an order
+ *     description: CK_STAFF marks an order as ISSUED. Transition CONFIRMED -> ISSUED.
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Order ID
+ *     responses:
+ *       200:
+ *         description: Order issued successfully
+ *       400:
+ *         description: Invalid request / validation error
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Only CK_STAFF can issue
+ *       404:
+ *         description: Order not found
+ *       500:
+ *         description: Internal server error
+ */
+router.patch(
+  "/orders/:id/issue",
+  verifyToken,
+  requireCKStaff,
+  orderController.issueOrder
+);
+
+/**
+ * @swagger
+ * /orders/{id}/deliver:
+ *   patch:
+ *     summary: Mark order as delivered
+ *     description: "Mark an order as DELIVERED (transition ISSUED -> DELIVERED). Allowed actors: FR_STAFF or MANAGER of the store."
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Order ID
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     order_item_id:
+ *                       type: integer
+ *                     received_quantity:
+ *                       type: integer
+ *     responses:
+ *       200:
+ *         description: Order marked as delivered
+ *       400:
+ *         description: Invalid request
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Not allowed to mark this order delivered
+ *       404:
+ *         description: Order not found
+ *       500:
+ *         description: Internal server error
+ */
+router.patch(
+  "/orders/:id/deliver",
+  verifyToken,
+  requireRoles(["FR_STAFF", "MANAGER"]),
+  orderController.deliverOrder
+);
+
 module.exports = router;

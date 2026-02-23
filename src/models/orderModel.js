@@ -127,6 +127,54 @@ exports.getAllOrders = async (role, storeId) => {
 };
 
 /**
+ * Update Order Status
+*/  
+exports.confirmOrder = async (orderId, confirmedBy) => {
+  const [result] = await pool.query(
+    `UPDATE Orders
+     SET status = 'CONFIRMED',
+         confirmed_by = ?,
+         updated_at = NOW()
+     WHERE id = ? AND status = 'SUBMITTED'`,
+    [confirmedBy, orderId]
+  );
+
+  return result.affectedRows;
+};
+
+/**
+ * Issue Order  
+*/
+exports.issueOrder = async (orderId, issuedBy) => {
+  const [result] = await pool.query(
+    `UPDATE Orders
+     SET status = 'ISSUED',
+         issued_by = ?,
+         updated_at = NOW()
+     WHERE id = ? AND status = 'CONFIRMED'`,
+    [issuedBy, orderId]
+  );
+
+  return result.affectedRows;
+};
+
+/** 
+ * deliver Order
+*/
+exports.deliverOrder = async (orderId, receivedBy) => {
+  const [result] = await pool.query(
+    `UPDATE Orders
+     SET status = 'DELIVERED',
+         received_by = ?,
+         received_at = NOW(),
+         updated_at = NOW()
+     WHERE id = ? AND status = 'ISSUED'`,
+    [receivedBy, orderId]
+  );
+
+  return result.affectedRows;
+};
+/**
  * Auto cancel orders after 2 days if still SUBMITTED
  */
 exports.autoCancelExpiredOrders = async () => {

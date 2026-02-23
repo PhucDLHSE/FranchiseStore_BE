@@ -182,41 +182,45 @@ router.get(
  *           schema:
  *             type: object
  *             required:
- *               - username
- *               - email
- *               - password
+ *               - store_id
  *               - role
+ *               - name
+ *               - username
+ *               - password
+ *               - phone
+ *               - dob
  *             properties:
- *               username:
- *                 type: string
- *                 description: Unique username
- *                 example: quan1staff
- *               email:
- *                 type: string
- *                 format: email
- *                 description: User email address
- *                 example: quan1staff@gmail.com
- *               password:
- *                 type: string
- *                 format: password
- *                 minLength: 5
- *                 description: Password (min 5 characters)
- *                 example: 12345
+ *               store_id:
+ *                 type: integer
+ *                 description: Store ID (required for FR_STAFF, MANAGER)
+ *                 example: 5
  *               role:
  *                 type: string
  *                 enum: [ADMIN, FR_STAFF, CK_STAFF, MANAGER, SC_COORDINATOR]
  *                 description: User role
  *                 example: FR_STAFF
- *               store_id:
- *                 type: integer
- *                 description: Store ID (required for FR_STAFF, MANAGER)
- *                 example: 5
+ *               name:
+ *                 type: string
+ *                 description: Full name of the user
+ *                 example: "Ú òa Dám ăn trong giờ Văn"
+ *               username:
+ *                 type: string
+ *                 description: Unique username
+ *                 example: quan1staff
+ *               password:
+ *                  type: string
+ *                  format: password
+ *                  minLength: 5
+ *                  description: Password (min 5 characters)
+ *                  example: 12345
  *               phone:
- *                 type: string
- *                 example: "0123456789"
- *               address:
- *                 type: string
- *                 example: "123 Main Street"
+ *                  type: string
+ *                  example: "0123456789"
+ *               dob:
+ *                  type: string
+ *                  format: date
+ *                  description: Date of birth
+ *                  example: "1990-01-01"
  *     responses:
  *       201:
  *         description: User created successfully
@@ -235,8 +239,6 @@ router.get(
  *                       type: integer
  *                       example: 1
  *                     username:
- *                       type: string
- *                     email:
  *                       type: string
  *                     role:
  *                       type: string

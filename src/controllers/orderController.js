@@ -165,3 +165,186 @@ exports.getAllOrders = async (req, res) => {
   }
 };
 
+/**
+ * Confirm Order (CK_STAFF)
+ */
+exports.confirmOrder = async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const user = req.user;
+
+    const affected = await orderModel.confirmOrder(orderId, user.id);
+
+    if (affected === 0) {
+      return response.error(res, {
+        code: "INVALID_ORDER",
+        message: "Order cannot be confirmed (not found or invalid status)"
+      });
+    }
+
+    const rows = await orderModel.getOrderById(orderId);
+    if (!rows || rows.length === 0) {
+      return response.error(res, ERROR.INTERNAL_ERROR);
+    }
+
+    const orderInfo = {
+      id: rows[0].id,
+      order_code: rows[0].order_code,
+      store_id: rows[0].store_id,
+      order_date: rows[0].order_date,
+      delivery_date: rows[0].delivery_date,
+      status: rows[0].status,
+      total_amount: rows[0].total_amount,
+      created_by: rows[0].created_by,
+      confirmed_by: rows[0].confirmed_by,
+      issued_by: rows[0].issued_by,
+      created_at: rows[0].created_at,
+      updated_at: rows[0].updated_at,
+      items: []
+    };
+
+    rows.forEach(row => {
+      if (row.order_item_id) {
+        orderInfo.items.push({
+          order_item_id: row.order_item_id,
+          product_id: row.product_id,
+          product_name: row.product_name,
+          quantity: row.quantity,
+          unit_price: row.unit_price,
+          total_price: row.total_price
+        });
+      }
+    });
+
+    return response.success(res, orderInfo, "Order confirmed successfully");
+  } catch (error) {
+    console.error(error);
+    return response.error(res, ERROR.INTERNAL_ERROR);
+  }
+};
+
+/**
+ * Issue Order (CK_STAFF)
+ */
+exports.issueOrder = async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const user = req.user;
+
+    const affected = await orderModel.issueOrder(orderId, user.id);
+
+    if (affected === 0) {
+      return response.error(res, {
+        code: "INVALID_ORDER",
+        message: "Order cannot be issued (not found or invalid status)"
+      });
+    }
+
+    const rows = await orderModel.getOrderById(orderId);
+    if (!rows || rows.length === 0) {
+      return response.error(res, ERROR.INTERNAL_ERROR);
+    }
+
+    const orderInfo = {
+      id: rows[0].id,
+      order_code: rows[0].order_code,
+      store_id: rows[0].store_id,
+      order_date: rows[0].order_date,
+      delivery_date: rows[0].delivery_date,
+      status: rows[0].status,
+      total_amount: rows[0].total_amount,
+      created_by: rows[0].created_by,
+      confirmed_by: rows[0].confirmed_by,
+      issued_by: rows[0].issued_by,
+      created_at: rows[0].created_at,
+      updated_at: rows[0].updated_at,
+      items: []
+    };
+
+    rows.forEach(row => {
+      if (row.order_item_id) {
+        orderInfo.items.push({
+          order_item_id: row.order_item_id,
+          product_id: row.product_id,
+          product_name: row.product_name,
+          quantity: row.quantity,
+          unit_price: row.unit_price,
+          total_price: row.total_price
+        });
+      }
+    });
+
+    return response.success(res, orderInfo, "Order issued successfully");
+  } catch (error) {
+    console.error(error);
+    return response.error(res, ERROR.INTERNAL_ERROR);
+  }
+};
+
+/**
+ * Deliver Order (FR_STAFF / MANAGER)
+ * Transition: ISSUED -> DELIVERED
+ */
+exports.deliverOrder = async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const user = req.user;
+    const rows = await orderModel.getOrderById(orderId);
+
+    if (!rows || rows.length === 0) {
+      return response.error(res, { code: "NOT_FOUND", message: "Order not found" });
+    }
+
+    // Store-level guard: FR_STAFF / MANAGER only allowed for their store
+    if ((user.role === "FR_STAFF" || user.role === "MANAGER") && rows[0].store_id !== user.store_id) {
+      return response.error(res, { code: "FORBIDDEN", message: "You are not allowed to mark this order delivered" });
+    }
+
+    const affected = await orderModel.deliverOrder(orderId, user.id);
+
+    if (affected === 0) {
+      return response.error(res, { code: "INVALID_ORDER", message: "Order cannot be marked delivered (not found or invalid status)" });
+    }
+
+    const updatedRows = await orderModel.getOrderById(orderId);
+    if (!updatedRows || updatedRows.length === 0) {
+      return response.error(res, ERROR.INTERNAL_ERROR);
+    }
+
+    const orderInfo = {
+      id: updatedRows[0].id,
+      order_code: updatedRows[0].order_code,
+      store_id: updatedRows[0].store_id,
+      order_date: updatedRows[0].order_date,
+      delivery_date: updatedRows[0].delivery_date,
+      status: updatedRows[0].status,
+      total_amount: updatedRows[0].total_amount,
+      created_by: updatedRows[0].created_by,
+      confirmed_by: updatedRows[0].confirmed_by,
+      issued_by: updatedRows[0].issued_by,
+      received_by: updatedRows[0].received_by,
+      created_at: updatedRows[0].created_at,
+      updated_at: updatedRows[0].updated_at,
+      items: []
+    };
+
+    updatedRows.forEach(row => {
+      if (row.order_item_id) {
+        orderInfo.items.push({
+          order_item_id: row.order_item_id,
+          product_id: row.product_id,
+          product_name: row.product_name,
+          quantity: row.quantity,
+          unit_price: row.unit_price,
+          total_price: row.total_price
+        });
+      }
+    });
+
+    return response.success(res, orderInfo, "Order marked as delivered");
+  } catch (error) {
+    console.error(error);
+    return response.error(res, ERROR.INTERNAL_ERROR);
+  }
+};
+
