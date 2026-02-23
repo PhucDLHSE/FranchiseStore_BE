@@ -73,7 +73,7 @@ router.post("/categories", verifyToken, requireAdmin, categoryController.create)
 /**
  * @swagger
  * /categories/{id}:
- *   put:
+ *   patch:
  *     summary: Update category (ADMIN)
  *     tags: [Category]
  *     security:

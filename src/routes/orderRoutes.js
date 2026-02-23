@@ -9,7 +9,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
 
 router.post("/orders", verifyToken, requireFRStaff, orderController.createOrder);
 
-router.get("/orders", verifyToken, requireRoles(["FR_STAFF", "MANAGER"]), orderController.getAllOrders);
+router.get("/orders", verifyToken, requireRoles(["FR_STAFF", "CK_STAFF", "MANAGER"]), orderController.getAllOrders);
 
 router.get("/orders/:id", verifyToken, requireRoles(["FR_STAFF", "MANAGER"]), orderController.getOrderDetail);
 

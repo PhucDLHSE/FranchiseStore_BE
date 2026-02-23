@@ -130,7 +130,7 @@ router.post("/stores", verifyToken, requireAdmin, storeController.create);
 /**
  * @swagger
  * /stores/{id}:
- *   put:
+ *   patch:
  *     summary: Update store
  *     tags: [Stores]
  *     security:
