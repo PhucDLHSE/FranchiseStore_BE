@@ -1,4 +1,5 @@
 const orderModel = require('../models/orderModel');
+const reservationModel = require("../models/reservationModel");
 const response = require('../utils/response');
 const ERROR = require('../utils/errorCodes');
 

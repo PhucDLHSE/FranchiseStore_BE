@@ -1,4 +1,4 @@
-const pool = require("../config/db");
+const pool = require("../configs/database");
 
 /**
  * Get inventory list by store (with filters)

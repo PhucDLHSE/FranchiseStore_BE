@@ -18,9 +18,11 @@ const swaggerSpec = require("./src/configs/swagger");
 const userRoutes = require("./src/routes/userRoutes");
 const authRoutes = require("./src/routes/authRoutes");
 const storeRoutes = require("./src/routes/storeRoutes");
+const inventoryRoutes = require("./src/routes/inventoryRoutes");
 const categoryRoutes = require("./src/routes/categoryRoutes");
 const productRoutes = require("./src/routes/productRoutes");
 const orderRoutes = require("./src/routes/orderRoutes");
+const reservationRoutes = require("./src/routes/reservationRoutes");
 const startAutoCancelJob = require("./src/services/autoCancelJob");
 
 
@@ -29,9 +31,11 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use("/api", userRoutes);
 app.use("/api", authRoutes);
 app.use("/api", storeRoutes);
+app.use("/api", inventoryRoutes);
 app.use("/api", categoryRoutes);
 app.use("/api", productRoutes);
 app.use("/api", orderRoutes);
+app.use("/api", reservationRoutes);
 
 
 /* ================= DB CONNECTION ================= */

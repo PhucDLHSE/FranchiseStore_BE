@@ -391,7 +391,7 @@ router.get(
 router.get(
   "/orders/:id",
   verifyToken,
-  requireRoles(["FR_STAFF", "MANAGER"]),
+  requireRoles(["FR_STAFF", "MANAGER", "CK_STAFF"]),
   orderController.getOrderDetail
 );
 
