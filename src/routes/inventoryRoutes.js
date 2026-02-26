@@ -36,7 +36,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
 
 /**
  * @swagger
- * /stores/{storeId}/inventory:
+ * /inventory:
  *   get:
  *     summary: Get inventory list for a store
  *     description: Retrieve all inventory items for the specified store.  
@@ -47,11 +47,6 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: storeId
- *         required: true
- *         schema:
- *           type: integer
  *       - in: query
  *         name: keyword
  *         schema:
@@ -97,7 +92,7 @@ router.get("/inventory", verifyToken, inventoryController.getByStore);
 
 /**
  * @swagger
- * /stores/{storeId}/inventory/summary:
+ * /inventory/summary:
  *   get:
  *     summary: Get inventory summary for a store
  *     description: Retrieve aggregated statistics (total quantity,
@@ -130,7 +125,7 @@ router.get("/inventory/summary", verifyToken, inventoryController.getSummary);
 
 /**
  * @swagger
- * /stores/inventory/{productId}:
+ * /inventory/{productId}:
  *   get:
  *     summary: Get a single inventory item
  *     description: Retrieve the inventory record for the given store and
