@@ -8,7 +8,7 @@ const { requireCKStaff } = require("../middlewares/roleMiddleware");
  * @swagger
  * tags:
  *   name: Reservations
- *   description: Production reservation linked to orders
+ *   description: Create Reservations for production and Update Inventory when Complete Reservations
  */
 
 /**

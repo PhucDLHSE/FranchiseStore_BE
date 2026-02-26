@@ -51,7 +51,7 @@ exports.createReservation = async (req, res) => {
 exports.completeReservation = async (req, res) => {
   try {
     const reservationId = req.params.id;
-    const user          = req.user;               // chứa store_id, role, …
+    const user          = req.user;              
 
     // 1. lấy reservation trước khi cập nhật
     const reservation = await reservationModel.getReservationById(reservationId);
