@@ -93,7 +93,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *       500:
  *         description: Internal server error
  */
-router.get("/stores/:storeId/inventory", verifyToken, inventoryController.getByStore);
+router.get("/inventory", verifyToken, inventoryController.getByStore);
 
 /**
  * @swagger
@@ -106,12 +106,6 @@ router.get("/stores/:storeId/inventory", verifyToken, inventoryController.getByS
  *       - Inventory
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: storeId
- *         required: true
- *         schema:
- *           type: integer
  *     responses:
  *       200:
  *         description: inventory summary
@@ -132,11 +126,11 @@ router.get("/stores/:storeId/inventory", verifyToken, inventoryController.getByS
  *       500:
  *         description: Internal server error
  */
-router.get("/stores/:storeId/inventory/summary", verifyToken, inventoryController.getSummary);
+router.get("/inventory/summary", verifyToken, inventoryController.getSummary);
 
 /**
  * @swagger
- * /stores/{storeId}/inventory/{productId}:
+ * /stores/inventory/{productId}:
  *   get:
  *     summary: Get a single inventory item
  *     description: Retrieve the inventory record for the given store and
@@ -146,11 +140,6 @@ router.get("/stores/:storeId/inventory/summary", verifyToken, inventoryControlle
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: storeId
- *         required: true
- *         schema:
- *           type: integer
  *       - in: path
  *         name: productId
  *         required: true
@@ -177,7 +166,7 @@ router.get("/stores/:storeId/inventory/summary", verifyToken, inventoryControlle
  *       500:
  *         description: Internal server error
  */
-router.get("/stores/:storeId/inventory/:productId", verifyToken, inventoryController.getOne);
+router.get("/inventory/:productId", verifyToken, inventoryController.getOne);
 
 /* Inventory operations */
 router.post("/stores/:storeId/inventory/increase", verifyToken, inventoryController.increase);

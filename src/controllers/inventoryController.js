@@ -2,22 +2,34 @@ const inventoryModel = require("../models/inventoryModel");
 const response = require("../utils/response");
 const ERROR_CODES = require("../utils/errorCodes");
 
-// người dùng chỉ thao tác kho của mình, trừ khi là CK/ADMIN/SC
-function checkStoreAccess(req) {
+function getStoreId(req) {
   const user = req.user || {};
-  const storeId = parseInt(req.params.storeId, 10);
+  if (user.role === "ADMIN" && req.query.storeId) {
+    return parseInt(req.query.storeId, 10);
+  }
+  return user.store_id;
+}
+
+function checkStoreAccess(req) {
+  const storeId = getStoreId(req);
   if (!storeId) return false;
-  if (["CK_STAFF","ADMIN","SC_COORDINATOR"].includes(user.role)) {
+
+  if (req.user.role === "ADMIN") {
     return true;
   }
-  return user.store_id === storeId;
+
+  return req.user.store_id === storeId;
 }
 
 exports.getByStore = async (req, res) => {
+  const storeId = getStoreId(req);
+  if (!storeId) {
+    return response.error(res, { code: "NOT_FOUND", message: "Store not found" });
+  }
   if (!checkStoreAccess(req)) return response.error(res, ERROR_CODES.FORBIDDEN);
   try {
     const data = await inventoryModel.findByStore({
-      storeId: req.params.storeId,
+      storeId,
       keyword: req.query.keyword,
       category_id: req.query.category_id,
       product_type: req.query.product_type,
@@ -31,9 +43,15 @@ exports.getByStore = async (req, res) => {
 };
 
 exports.getSummary = async (req, res) => {
-  if (!checkStoreAccess(req)) return response.error(res, ERROR_CODES.FORBIDDEN);
+  const storeId = getStoreId(req);
+  if (!storeId) {
+    return response.error(res, { code: "NOT_FOUND", message: "Store not found" });
+  }
+  if (!checkStoreAccess(req)) {
+    return response.error(res, ERROR_CODES.FORBIDDEN);
+  }
   try {
-    const summary = await inventoryModel.getSummary(req.params.storeId);
+    const summary = await inventoryModel.getSummary(storeId);
     return response.success(res, summary);
   } catch (err) {
     console.error(err);
@@ -42,12 +60,15 @@ exports.getSummary = async (req, res) => {
 };
 
 exports.getOne = async (req, res) => {
-  if (!checkStoreAccess(req)) return response.error(res, ERROR_CODES.FORBIDDEN);
+  const storeId = getStoreId(req);
+  if (!storeId) {
+    return response.error(res, { code: "NOT_FOUND", message: "Store not found" });
+  }
+  if (!checkStoreAccess(req)) {
+    return response.error(res, ERROR_CODES.FORBIDDEN);
+  }
   try {
-    const item = await inventoryModel.findOne(
-      req.params.storeId,
-      req.params.productId
-    );
+    const item = await inventoryModel.findOne(storeId, req.params.productId);
     if (!item) return response.error(res, ERROR_CODES.NOT_FOUND);
     return response.success(res, item);
   } catch (err) {
@@ -57,11 +78,12 @@ exports.getOne = async (req, res) => {
 };
 
 exports.increase = async (req, res) => {
+  const storeId = getStoreId(req);
   if (!checkStoreAccess(req)) return response.error(res, ERROR_CODES.FORBIDDEN);
   try {
     const { product_id, quantity } = req.body;
     if (!product_id || !quantity) return response.error(res, ERROR_CODES.BAD_REQUEST);
-    await inventoryModel.increaseStock(req.params.storeId, product_id, quantity);
+    await inventoryModel.increaseStock(storeId, product_id, quantity);
     return response.success(res, null, "Stock increased");
   } catch (err) {
     console.error(err);
@@ -70,15 +92,12 @@ exports.increase = async (req, res) => {
 };
 
 exports.decrease = async (req, res) => {
+  const storeId = getStoreId(req);
   if (!checkStoreAccess(req)) return response.error(res, ERROR_CODES.FORBIDDEN);
   try {
     const { product_id, quantity } = req.body;
     if (!product_id || !quantity) return response.error(res, ERROR_CODES.BAD_REQUEST);
-    const affected = await inventoryModel.decreaseStock(
-      req.params.storeId,
-      product_id,
-      quantity
-    );
+    const affected = await inventoryModel.decreaseStock(storeId, product_id, quantity);
     if (!affected) return response.error(res, ERROR_CODES.BAD_REQUEST);
     return response.success(res, null, "Stock decreased");
   } catch (err) {
@@ -88,15 +107,12 @@ exports.decrease = async (req, res) => {
 };
 
 exports.reserve = async (req, res) => {
+  const storeId = getStoreId(req);
   if (!checkStoreAccess(req)) return response.error(res, ERROR_CODES.FORBIDDEN);
   try {
     const { product_id, quantity } = req.body;
     if (!product_id || !quantity) return response.error(res, ERROR_CODES.BAD_REQUEST);
-    const affected = await inventoryModel.reserveStock(
-      req.params.storeId,
-      product_id,
-      quantity
-    );
+    const affected = await inventoryModel.reserveStock(storeId, product_id, quantity);
     if (!affected) return response.error(res, ERROR_CODES.BAD_REQUEST);
     return response.success(res, null, "Stock reserved");
   } catch (err) {
@@ -106,15 +122,12 @@ exports.reserve = async (req, res) => {
 };
 
 exports.release = async (req, res) => {
+  const storeId = getStoreId(req);
   if (!checkStoreAccess(req)) return response.error(res, ERROR_CODES.FORBIDDEN);
   try {
     const { product_id, quantity } = req.body;
     if (!product_id || !quantity) return response.error(res, ERROR_CODES.BAD_REQUEST);
-    const affected = await inventoryModel.releaseReservedStock(
-      req.params.storeId,
-      product_id,
-      quantity
-    );
+    const affected = await inventoryModel.releaseReservedStock(storeId, product_id, quantity);
     if (!affected) return response.error(res, ERROR_CODES.BAD_REQUEST);
     return response.success(res, null, "Reserved stock released");
   } catch (err) {
