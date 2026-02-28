@@ -25,7 +25,7 @@ const { requireCKStaff } = require("../middlewares/roleMiddleware");
  *         application/json:
  *           schema:
  *             type: object
- *             required: [store_to, items]
+ *             required: [order_id, store_to, items]
  *             properties:
  *               order_id:
  *                 type: integer
@@ -42,21 +42,22 @@ const { requireCKStaff } = require("../middlewares/roleMiddleware");
  *                     quantity:
  *                       type: number
  *             example:
+ *               order_id: 40
  *               store_to: 3
  *               items:
  *                 - product_id: 5
  *                   quantity: 10
  *     responses:
  *       201:
- *         description: goods issue created
+ *         description: Goods issue created
  *       400:
- *         description: invalid input
+ *         description: Invalid input
  *       401:
- *         description: unauthorized
+ *         description: Unauthorized
  *       403:
- *         description: forbidden
+ *         description: Forbidden
  *       500:
- *         description: internal error
+ *         description: Internal error
  */
 router.post(
   "/goods-issues",
@@ -81,17 +82,17 @@ router.post(
  *           type: integer
  *     responses:
  *       200:
- *         description: issue completed and receipt generated
+ *         description: Issue completed and receipt generated
  *       400:
- *         description: bad request / invalid state
+ *         description: Bad request / invalid state
  *       401:
- *         description: unauthorized
+ *         description: Unauthorized
  *       403:
- *         description: forbidden
+ *         description: Forbidden
  *       404:
- *         description: not found
+ *         description: Not found
  *       500:
- *         description: internal error
+ *         description: Internal error
  */
 router.patch(
   "/goods-issues/:id/complete",

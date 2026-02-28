@@ -24,10 +24,10 @@ const { requireAdmin } = require("../middlewares/roleMiddleware");
  *             properties:
  *               username:
  *                 type: string
- *                 example: frstaff1
+ *                 example: quan1staff
  *               password:
  *                 type: string
- *                 example: 123456
+ *                 example: 12345
  *     responses:
  *       200:
  *         description: Login success
