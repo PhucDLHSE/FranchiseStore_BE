@@ -23,6 +23,8 @@ const categoryRoutes = require("./src/routes/categoryRoutes");
 const productRoutes = require("./src/routes/productRoutes");
 const orderRoutes = require("./src/routes/orderRoutes");
 const reservationRoutes = require("./src/routes/reservationRoutes");
+const goodsIssueRoutes = require("./src/routes/goodsIssueRoutes");
+const goodsReceiptRoutes = require("./src/routes/goodsReceiptRoutes.js");
 const startAutoCancelJob = require("./src/services/autoCancelJob");
 
 
@@ -36,6 +38,9 @@ app.use("/api", categoryRoutes);
 app.use("/api", productRoutes);
 app.use("/api", orderRoutes);
 app.use("/api", reservationRoutes);
+app.use("/api", goodsIssueRoutes);
+app.use("/api", goodsReceiptRoutes);
+
 
 
 /* ================= DB CONNECTION ================= */

@@ -174,6 +174,15 @@ exports.deliverOrder = async (orderId, receivedBy) => {
 
   return result.affectedRows;
 };
+
+exports.getById = async (orderId) => {
+  const [rows] = await pool.query(
+    `SELECT * FROM Orders WHERE id = ?`,
+    [orderId]
+  );
+  return rows.length ? rows[0] : null;
+};
+
 /**
  * Auto cancel orders after 2 days if still SUBMITTED
  */
