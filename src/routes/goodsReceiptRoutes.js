@@ -26,7 +26,7 @@ const { requireFRStaff } = require("../middlewares/roleMiddleware.js");
  *       - Can receive multiple GR for same Order
  *       - Each GR represents one shipment from CK
  *       - Order status updates to DELIVERED only when total received >= total ordered
- *     tags: [GoodsReceipt]
+ *     tags: [Goods Receipt]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -79,7 +79,7 @@ router.get(
  *       **FR_STAFF only.** Retrieve detailed information of a specific Goods Receipt with all items.
  *       
  *       This allows FR_STAFF to verify items before confirming receipt.
- *     tags: [GoodsReceipt]
+ *     tags: [Goods Receipt]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -172,7 +172,7 @@ router.get(
  *         → GI #1 (90 items) → confirm GR #1 → delivered_quantity=90/100 (ISSUED)
  *         → GI #2 (10 items) → confirm GR #2 → delivered_quantity=100/100 (DELIVERED)
  *       ```
- *     tags: [GoodsReceipt]
+ *     tags: [Goods Receipt]
  *     security:
  *       - bearerAuth: []
  *     parameters:

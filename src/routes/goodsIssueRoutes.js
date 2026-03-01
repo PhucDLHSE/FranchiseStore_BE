@@ -20,7 +20,7 @@ const { requireCKStaff } = require("../middlewares/roleMiddleware");
  *       **CK_STAFF only.** Retrieve all Goods Issues created by Central Kitchen.
  *       
  *       Statuses: CREATED (pending completion), COMPLETED (stock deducted, GR created)
- *     tags: [GoodsIssue]
+ *     tags: [Goods Issue]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -90,7 +90,7 @@ router.get(
  *       **Supports Partial Delivery:**
  *       - Can create multiple GI for same Order
  *       - Example: Order 100 items → GI#1: 90 items, GI#2: 10 items
- *     tags: [GoodsIssue]
+ *     tags: [Goods Issue]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -247,7 +247,7 @@ router.post(
  *       **Next Step:**
  *       - FR_STAFF receives the Goods Receipt and confirms it
  *       - When all items received: Order automatically updates to DELIVERED
- *     tags: [GoodsIssue]
+ *     tags: [Goods Issue]
  *     security:
  *       - bearerAuth: []
  *     parameters:
