@@ -176,4 +176,14 @@ exports.releaseReservedStock = async (storeId, productId, quantity) => {
 
   return result.affectedRows;
 };
+
+exports.getByStoreAndProduct = async (storeId, productId) => {
+  const [rows] = await pool.query(
+    `SELECT * FROM Inventory
+     WHERE store_id = ? AND product_id = ?
+     LIMIT 1`,
+    [storeId, productId]
+  );
+  return rows.length ? rows[0] : null;
+};
   

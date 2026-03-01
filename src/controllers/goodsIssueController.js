@@ -4,6 +4,7 @@ const inventoryModel = require("../models/inventoryModel");
 const orderModel = require("../models/orderModel");
 const response = require("../utils/response");
 const ERROR = require("../utils/errorCodes");
+const pool = require("../configs/database");  // ✅ Thêm import pool
 
 exports.create = async (req, res) => {
   try {
@@ -17,6 +18,39 @@ exports.create = async (req, res) => {
       return response.error(res, ERROR.BAD_REQUEST, "store_to is required");
     }
 
+    // ✅ Validate each item has required fields
+    for (const item of items) {
+      if (!item.product_id || !item.quantity) {
+        return response.error(res, ERROR.BAD_REQUEST, "Each item must have product_id and quantity");
+      }
+      if (item.quantity <= 0) {
+        return response.error(res, ERROR.BAD_REQUEST, `Quantity for product ${item.product_id} must be greater than 0`);
+      }
+    }
+
+    // ✅ Validate inventory before creating Goods Issue
+    console.log(`[GI Create] Validating inventory for store ${user.store_id}`);
+    
+    for (const item of items) {
+      const inventory = await inventoryModel.getByStoreAndProduct(
+        user.store_id,
+        item.product_id
+      );
+
+      const availableQuantity = inventory ? inventory.quantity : 0;
+
+      console.log(`[GI Create] Product ${item.product_id}: required=${item.quantity}, available=${availableQuantity}`);
+
+      if (availableQuantity < item.quantity) {
+        return response.error(
+          res,
+          { code: 400, message: "Insufficient inventory" },
+          `Insufficient stock for product ${item.product_id}. Required: ${item.quantity}, Available: ${availableQuantity}`
+        );
+      }
+    }
+
+    // ✅ All validations passed, create Goods Issue
     const issueId = await giModel.create({
       orderId: order_id || null,
       storeFrom: user.store_id,
@@ -28,7 +62,7 @@ exports.create = async (req, res) => {
     const issue = await giModel.getById(issueId);
     return response.success(res, issue, "Goods issue created");
   } catch (err) {
-    console.error(err);
+    console.error("[GI Create] Error:", err);
     return response.error(res, ERROR.INTERNAL_ERROR);
   }
 };
@@ -72,15 +106,26 @@ exports.complete = async (req, res) => {
       receipt = { id: receiptId, receipt_code: "GR-" + Date.now() };
     }
 
-    // 3. nếu có order_id thì tự động update order status CONFIRMED -> ISSUED
+    // 3. ✅ Nếu có order_id và đây là lần đầu issue, thì update status CONFIRMED -> ISSUED
     if (issue.order_id) {
       try {
-        const updated = await orderModel.issueOrder(issue.order_id, user.id);
-        if (!updated) {
-          console.warn(`Failed to update order ${issue.order_id} to ISSUED`);
+        console.log(`[GI Complete] Checking order status for order ${issue.order_id}`);
+        const [orderRows] = await pool.query(
+          `SELECT status FROM Orders WHERE id = ?`,
+          [issue.order_id]
+        );
+        
+        if (orderRows.length && orderRows[0].status === "CONFIRMED") {
+          console.log(`[GI Complete] Order ${issue.order_id} is CONFIRMED, updating to ISSUED`);
+          const issueResult = await orderModel.issueOrder(issue.order_id, user.id);
+          if (issueResult) {
+            console.log(`[GI Complete] ✅ Order ${issue.order_id} successfully updated to ISSUED`);
+          }
+        } else {
+          console.log(`[GI Complete] Order ${issue.order_id} is already ISSUED (partial delivery)`);
         }
       } catch (orderErr) {
-        console.error("Error updating order to ISSUED:", orderErr);
+        console.error("[GI Complete] Error updating order to ISSUED:", orderErr);
       }
     }
 

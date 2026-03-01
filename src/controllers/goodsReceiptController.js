@@ -62,15 +62,19 @@ exports.confirm = async (req, res) => {
       await inventoryModel.increaseStock(storeId, it.product_id, it.quantity);
     }
 
-    // 2. nếu có order_id thì tự động update order status ISSUED -> DELIVERED
+    // 2. ✅ Nếu có order_id thì check nếu đã nhận đủ hàng thì update ISSUED -> DELIVERED
     if (receipt.order_id) {
       try {
-        const updated = await orderModel.deliverOrder(receipt.order_id, user.id);
-        if (!updated) {
-          console.warn(`Failed to update order ${receipt.order_id} to DELIVERED`);
+        console.log(`[GR Confirm] Checking delivery status for order ${receipt.order_id}`);
+        const deliveryResult = await orderModel.updateDeliveredQuantity(receipt.order_id);
+        
+        if (deliveryResult.statusUpdated) {
+          console.log(`[GR Confirm] ✅ Order ${receipt.order_id} is now DELIVERED (all items received: ${deliveryResult.delivered}/${deliveryResult.total})`);
+        } else {
+          console.log(`[GR Confirm] Order ${receipt.order_id} is partial (${deliveryResult.delivered}/${deliveryResult.total} items received)`);
         }
       } catch (orderErr) {
-        console.error("Error updating order to DELIVERED:", orderErr);
+        console.error("[GR Confirm] Error updating order delivery status:", orderErr);
       }
     }
 

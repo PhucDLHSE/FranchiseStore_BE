@@ -175,6 +175,61 @@ exports.deliverOrder = async (orderId, receivedBy) => {
   return result.affectedRows;
 };
 
+/**
+ * Update delivered quantity and check if all items received
+ */
+exports.updateDeliveredQuantity = async (orderId) => {
+  // 1. Lấy tổng số lượng trong order
+  const [orderRows] = await pool.query(
+    `SELECT SUM(quantity) as total_ordered FROM OrderItem WHERE order_id = ?`,
+    [orderId]
+  );
+  const totalOrdered = orderRows[0]?.total_ordered || 0;
+
+  // 2. Lấy tổng số lượng đã nhận (từ Goods Receipt đã CONFIRMED)
+  const [receivedRows] = await pool.query(
+    `SELECT SUM(gri.quantity) as total_received
+     FROM GoodsReceipt gr
+     JOIN GoodsReceiptItem gri ON gr.id = gri.goods_receipt_id
+     WHERE gr.order_id = ? AND gr.status = 'CONFIRMED'`,
+    [orderId]
+  );
+  const totalReceived = receivedRows[0]?.total_received || 0;
+
+  console.log(`[Order ${orderId}] Total ordered: ${totalOrdered}, Total received: ${totalReceived}`);
+
+  // 3. Update delivered_quantity
+  const [result] = await pool.query(
+    `UPDATE Orders
+     SET delivered_quantity = ?
+     WHERE id = ?`,
+    [totalReceived, orderId]
+  );
+
+  // 4. Nếu đã nhận đủ hàng thì update status thành DELIVERED
+  if (totalReceived >= totalOrdered && totalOrdered > 0) {
+    console.log(`[Order ${orderId}] All items received, updating status to DELIVERED`);
+    const [updateResult] = await pool.query(
+      `UPDATE Orders
+       SET status = 'DELIVERED', updated_at = NOW()
+       WHERE id = ? AND status = 'ISSUED'`,
+      [orderId]
+    );
+    return { 
+      statusUpdated: updateResult.affectedRows > 0, 
+      delivered: totalReceived, 
+      total: totalOrdered 
+    };
+  } else {
+    console.log(`[Order ${orderId}] Partial delivery (${totalReceived}/${totalOrdered})`);
+    return { 
+      statusUpdated: false, 
+      delivered: totalReceived, 
+      total: totalOrdered 
+    };
+  }
+};
+
 exports.getById = async (orderId) => {
   const [rows] = await pool.query(
     `SELECT * FROM Orders WHERE id = ?`,

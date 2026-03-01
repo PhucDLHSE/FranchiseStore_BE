@@ -48,6 +48,7 @@ exports.getById = async (issueId) => {
     [issueId]
   );
   if (!rows.length) return null;
+  
   const base = {
     id: rows[0].id,
     issue_code: rows[0].issue_code,
@@ -61,9 +62,13 @@ exports.getById = async (issueId) => {
     updated_at: rows[0].updated_at,
     items: []
   };
+  
   rows.forEach(r => {
-    base.items.push({ product_id: r.product_id, quantity: r.quantity });
+    if (r.product_id) {  // Tránh thêm items rỗng từ LEFT JOIN
+      base.items.push({ product_id: r.product_id, quantity: r.quantity });
+    }
   });
+  
   return base;
 };
 
@@ -89,9 +94,23 @@ exports.listByStore = async (storeId) => {
   return rows;
 };
 
+/**
+ * Check if order already has an existing Goods Issue
+ */
+exports.getByOrderId = async (orderId) => {
+  const [rows] = await pool.query(
+    `SELECT * FROM GoodsIssue
+     WHERE order_id = ? AND status != 'CANCELLED'
+     LIMIT 1`,
+    [orderId]
+  );
+  return rows.length ? rows[0] : null;
+};
+
 exports.generateReceipt = async (issueId) => {
   const issue = await exports.getById(issueId);
   if (!issue) throw new Error("issue not found");
+  
   const receiptData = {
     goodsIssueId: issue.id,
     orderId: issue.order_id,
@@ -99,6 +118,7 @@ exports.generateReceipt = async (issueId) => {
     createdBy: issue.created_by,
     items: issue.items
   };
+  
   const receiptId = await goodsReceiptModel.createFromIssue(receiptData);
-  return { receiptId, receiptCode: receiptData.issueCode };  
+  return receiptId;
 };

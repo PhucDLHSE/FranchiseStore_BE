@@ -125,6 +125,10 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *                       enum: [SUBMITTED, CONFIRMED, ISSUED, DELIVERED, CANCELLED]
  *                       description: Order status
  *                       example: SUBMITTED
+ *                     delivered_quantity:
+ *                       type: integer
+ *                       description: Number of items already received (0 for new order)
+ *                       example: 0
  *                     total_amount:
  *                       type: number
  *                       format: float
@@ -216,11 +220,18 @@ router.post(
  * @swagger
  * /orders:
  *   get:
- *     summary: Get all orders (MANAGER/CK_STAFF can see all orders, FR_STAFF can only see their store's orders)
+ *     summary: Get all orders
  *     description: |
  *       Retrieve list of orders based on user role.
- *       - FR_STAFF, MANAGER: Can only see orders of their own store
- *       - CK_STAFF: Can see all orders
+ *       - **FR_STAFF, MANAGER:** Can only see orders of their own store
+ *       - **CK_STAFF, ADMIN:** Can see all orders
+ *       
+ *       **Order Status Flow:**
+ *       - SUBMITTED: Order created by FR_STAFF
+ *       - CONFIRMED: CK_STAFF confirmed the order
+ *       - ISSUED: First Goods Issue completed (can have multiple Issues for partial delivery)
+ *       - DELIVERED: All ordered items received (delivered_quantity >= total_quantity)
+ *       - CANCELLED: Order cancelled by FR_STAFF/MANAGER
  *     tags: [Orders]
  *     security:
  *       - bearerAuth: []
@@ -235,7 +246,7 @@ router.post(
  *         name: store_id
  *         schema:
  *           type: integer
- *         description: Filter by store ID (MANAGER/CK_STAFF only)
+ *         description: Filter by store ID (CK_STAFF/ADMIN only)
  *     responses:
  *       200:
  *         description: List of orders retrieved successfully
@@ -260,7 +271,7 @@ router.post(
  *                         example: "ORD-1740244800000"
  *                       store_id:
  *                         type: integer
- *                         example: 5
+ *                         example: 2
  *                       order_date:
  *                         type: string
  *                         format: date-time
@@ -270,6 +281,9 @@ router.post(
  *                       status:
  *                         type: string
  *                         enum: [SUBMITTED, CONFIRMED, ISSUED, DELIVERED, CANCELLED]
+ *                       delivered_quantity:
+ *                         type: integer
+ *                         description: Items already received
  *                       total_amount:
  *                         type: number
  *                         format: float
@@ -301,8 +315,20 @@ router.get(
  *     summary: Get order detail
  *     description: |
  *       Retrieve detailed information of a specific order including all items.
- *       - FR_STAFF, MANAGER: Can only view orders from their own store
- *       - CK_STAFF, ADMIN: Can view any order
+ *       - **FR_STAFF, MANAGER:** Can only view orders from their own store
+ *       - **CK_STAFF, ADMIN:** Can view any order
+ *       
+ *       **Partial Delivery Support:**
+ *       - delivered_quantity: Total items received so far
+ *       - items[].quantity: Total items ordered for each product
+ *       - Order transitions to DELIVERED only when delivered_quantity >= sum of all item quantities
+ *       
+ *       **Example Partial Delivery:**
+ *       ```
+ *       Order #1: 100 items total (delivered_quantity: 0)
+ *         → GI #1: 90 items + GR #1: 90 items received (delivered_quantity: 90)
+ *         → GI #2: 10 items + GR #2: 10 items received (delivered_quantity: 100, status: DELIVERED)
+ *       ```
  *     tags: [Orders]
  *     security:
  *       - bearerAuth: []
@@ -330,18 +356,22 @@ router.get(
  *                   example: "ORD-1740244800000"
  *                 store_id:
  *                   type: integer
- *                   example: 5
+ *                   example: 2
  *                 order_date:
  *                   type: string
  *                   format: date-time
  *                 delivery_date:
  *                   type: string
  *                   format: date
- *                   example: "2026-02-25"
+ *                   example: "2026-03-06"
  *                 status:
  *                   type: string
  *                   enum: [SUBMITTED, CONFIRMED, ISSUED, DELIVERED, CANCELLED]
- *                   example: SUBMITTED
+ *                   example: ISSUED
+ *                 delivered_quantity:
+ *                   type: integer
+ *                   description: Total items received so far
+ *                   example: 90
  *                 total_amount:
  *                   type: number
  *                   format: float
@@ -353,6 +383,9 @@ router.get(
  *                   type: integer
  *                   nullable: true
  *                 issued_by:
+ *                   type: integer
+ *                   nullable: true
+ *                 received_by:
  *                   type: integer
  *                   nullable: true
  *                 created_at:
@@ -378,7 +411,7 @@ router.get(
  *                         example: "Product A"
  *                       quantity:
  *                         type: integer
- *                         example: 10
+ *                         example: 100
  *                       unit_price:
  *                         type: number
  *                         format: float
@@ -386,7 +419,7 @@ router.get(
  *                       total_price:
  *                         type: number
  *                         format: float
- *                         example: 200000
+ *                         example: 2000000
  *       401:
  *         description: Unauthorized - Missing or invalid token
  *       403:
@@ -408,7 +441,16 @@ router.get(
  * /orders/{id}/confirm:
  *   patch:
  *     summary: Confirm an order (CK_STAFF only)
- *     description: CK_STAFF confirms an order. Transition SUBMITTED -> CONFIRMED.
+ *     description: |
+ *       **CK_STAFF confirms an order.**
+ *       
+ *       Transition: SUBMITTED → CONFIRMED
+ *       
+ *       **Workflow:**
+ *       - CK_STAFF receives Order from FR_STAFF
+ *       - CK_STAFF confirms that order is valid and checks inventory
+ *       - Order moves to CONFIRMED status
+ *       - Next: CK_STAFF creates Reservation (if needed) then Goods Issue
  *     tags: [Orders]
  *     security:
  *       - bearerAuth: []
@@ -419,13 +461,39 @@ router.get(
  *         schema:
  *           type: integer
  *         description: Order ID
+ *         example: 1
  *     responses:
  *       200:
  *         description: Order confirmed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   description: Updated order object with CONFIRMED status
+ *                 message:
+ *                   type: string
+ *                   example: "Order confirmed successfully"
  *       400:
- *         description: Invalid request / validation error
+ *         description: Invalid request / validation error (order not in SUBMITTED status)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error_code:
+ *                   type: integer
+ *                   example: 400
+ *                 message:
+ *                   type: string
+ *                   example: "Order cannot be confirmed (not found or invalid status)"
  *       401:
- *         description: Unauthorized
+ *         description: Unauthorized - Missing or invalid token
  *       403:
  *         description: Forbidden - Only CK_STAFF can confirm
  *       404:
@@ -439,95 +507,5 @@ router.patch(
   requireCKStaff,
   orderController.confirmOrder
 );
-
-// /**
-//  * @swagger
-//  * /orders/{id}/issue:
-//  *   patch:
-//  *     summary: Issue an order
-//  *     description: CK_STAFF marks an order as ISSUED. Transition CONFIRMED -> ISSUED.
-//  *     tags: [Orders]
-//  *     security:
-//  *       - bearerAuth: []
-//  *     parameters:
-//  *       - in: path
-//  *         name: id
-//  *         required: true
-//  *         schema:
-//  *           type: integer
-//  *         description: Order ID
-//  *     responses:
-//  *       200:
-//  *         description: Order issued successfully
-//  *       400:
-//  *         description: Invalid request / validation error
-//  *       401:
-//  *         description: Unauthorized
-//  *       403:
-//  *         description: Forbidden - Only CK_STAFF can issue
-//  *       404:
-//  *         description: Order not found
-//  *       500:
-//  *         description: Internal server error
-//  */
-// router.patch(
-//   "/orders/:id/issue",
-//   verifyToken,
-//   requireCKStaff,
-//   orderController.issueOrder
-// );
-
-// /**
-//  * @swagger
-//  * /orders/{id}/deliver:
-//  *   patch:
-//  *     summary: Mark order as delivered
-//  *     description: "Mark an order as DELIVERED (transition ISSUED -> DELIVERED). Allowed actors: FR_STAFF or MANAGER of the store."
-//  *     tags: [Orders]
-//  *     security:
-//  *       - bearerAuth: []
-//  *     parameters:
-//  *       - in: path
-//  *         name: id
-//  *         required: true
-//  *         schema:
-//  *           type: integer
-//  *         description: Order ID
-//  *     requestBody:
-//  *       required: false
-//  *       content:
-//  *         application/json:
-//  *           schema:
-//  *             type: object
-//  *             properties:
-//  *               items:
-//  *                 type: array
-//  *                 items:
-//  *                   type: object
-//  *                   properties:
-//  *                     order_item_id:
-//  *                       type: integer
-//  *                     received_quantity:
-//  *                       type: integer
-//  *     responses:
-//  *       200:
-//  *         description: Order marked as delivered
-//  *       400:
-//  *         description: Invalid request
-//  *       401:
-//  *         description: Unauthorized
-//  *       403:
-//  *         description: Forbidden - Not allowed to mark this order delivered
-//  *       404:
-//  *         description: Order not found
-//  *       500:
-//  *         description: Internal server error
-//  */
-// router.patch(
-//   "/orders/:id/deliver",
-//   verifyToken,
-//   requireRoles(["FR_STAFF", "MANAGER"]),
-//   orderController.deliverOrder
-// );
 
 module.exports = router;
