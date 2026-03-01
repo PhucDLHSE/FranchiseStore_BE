@@ -11,10 +11,42 @@ exports.createOrder = async (req, res) => {
     const { delivery_date, items } = req.body;
     const user = req.user;
 
+    // ✅ Validate items
     if (!items || items.length === 0) {
       return response.error(res, {
-        code: "INVALID_ORDER",
+        code: 400,
         message: "Order must contain at least one item"
+      });
+    }
+
+    // ✅ Validate delivery_date
+    if (!delivery_date) {
+      return response.error(res, {
+        code: 400,
+        message: "delivery_date is required"
+      });
+    }
+
+    const deliveryDateObj = new Date(delivery_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // không được truyền ngày trong quá khứ
+    if (deliveryDateObj < today) {
+      return response.error(res, {
+        code: 400,
+        message: "delivery_date cannot be in the past"
+      });
+    }
+
+    // phải cách ngày tạo order ít nhất 5 ngày
+    const minDeliveryDate = new Date(today);
+    minDeliveryDate.setDate(minDeliveryDate.getDate() + 5);
+
+    if (deliveryDateObj < minDeliveryDate) {
+      return response.error(res, {
+        code: 400,
+        message: "delivery_date must be at least 5 days from today"
       });
     }
 
@@ -32,48 +64,48 @@ exports.createOrder = async (req, res) => {
     // 2️⃣ Fetch full order detail
     const rows = await orderModel.getOrderById(orderId);
 
-if (!rows || rows.length === 0) {
-  return response.error(res, ERROR.INTERNAL_ERROR);
-}
+    if (!rows || rows.length === 0) {
+      return response.error(res, ERROR.INTERNAL_ERROR);
+    }
 
-const orderInfo = {
-  id: rows[0].id,
-  order_code: rows[0].order_code,
-  store_id: rows[0].store_id,
-  order_date: rows[0].order_date,
-  delivery_date: rows[0].delivery_date,
-  status: rows[0].status,
-  total_amount: rows[0].total_amount,
-  created_by: rows[0].created_by,
-  confirmed_by: rows[0].confirmed_by,
-  issued_by: rows[0].issued_by,
-  created_at: rows[0].created_at,
-  updated_at: rows[0].updated_at,
-  items: []
-};
+    const orderInfo = {
+      id: rows[0].id,
+      order_code: rows[0].order_code,
+      store_id: rows[0].store_id,
+      order_date: rows[0].order_date,
+      delivery_date: rows[0].delivery_date,
+      status: rows[0].status,
+      total_amount: rows[0].total_amount,
+      created_by: rows[0].created_by,
+      confirmed_by: rows[0].confirmed_by,
+      issued_by: rows[0].issued_by,
+      created_at: rows[0].created_at,
+      updated_at: rows[0].updated_at,
+      items: []
+    };
 
-rows.forEach(row => {
-  if (row.order_item_id) {
-    orderInfo.items.push({
-      order_item_id: row.order_item_id,
-      product_id: row.product_id,
-      product_name: row.product_name,
-      quantity: row.quantity,
-      unit_price: row.unit_price,
-      total_price: row.total_price
+    rows.forEach(row => {
+      if (row.order_item_id) {
+        orderInfo.items.push({
+          order_item_id: row.order_item_id,
+          product_id: row.product_id,
+          product_name: row.product_name,
+          quantity: row.quantity,
+          unit_price: row.unit_price,
+          total_price: row.total_price
+        });
+      }
     });
-  }
-});
 
-return response.success(
-  res,
-  orderInfo,
-  "Order created successfully"
-);
+    return response.success(
+      res,
+      orderInfo,
+      "Order created successfully"
+    );
 
   } catch (error) {
     console.error(error);
-    return response.error(res, ERROR.INTERNAL_ERROR);
+    return response.error(res, { code: 500, message: "Internal server error" });
   }
 };
 
@@ -178,7 +210,7 @@ exports.confirmOrder = async (req, res) => {
 
     if (affected === 0) {
       return response.error(res, {
-        code: "INVALID_ORDER",
+        code: 400,
         message: "Order cannot be confirmed (not found or invalid status)"
       });
     }
@@ -236,7 +268,7 @@ exports.issueOrder = async (req, res) => {
 
     if (affected === 0) {
       return response.error(res, {
-        code: "INVALID_ORDER",
+        code: 400,
         message: "Order cannot be issued (not found or invalid status)"
       });
     }
@@ -293,18 +325,18 @@ exports.deliverOrder = async (req, res) => {
     const rows = await orderModel.getOrderById(orderId);
 
     if (!rows || rows.length === 0) {
-      return response.error(res, { code: "NOT_FOUND", message: "Order not found" });
+      return response.error(res, { code: 404, message: "Order not found" });
     }
 
     // Store-level guard: FR_STAFF / MANAGER only allowed for their store
     if ((user.role === "FR_STAFF" || user.role === "MANAGER") && rows[0].store_id !== user.store_id) {
-      return response.error(res, { code: "FORBIDDEN", message: "You are not allowed to mark this order delivered" });
+      return response.error(res, { code: 403, message: "You are not allowed to mark this order delivered" });
     }
 
     const affected = await orderModel.deliverOrder(orderId, user.id);
 
     if (affected === 0) {
-      return response.error(res, { code: "INVALID_ORDER", message: "Order cannot be marked delivered (not found or invalid status)" });
+      return response.error(res, { code: 400, message: "Order cannot be marked delivered (not found or invalid status)" });
     }
 
     const updatedRows = await orderModel.getOrderById(orderId);
@@ -345,7 +377,6 @@ exports.deliverOrder = async (req, res) => {
     return response.success(res, orderInfo, "Order marked as delivered");
   } catch (error) {
     console.error(error);
-    return response.error(res, ERROR.INTERNAL_ERROR);
+    return response.error(res, { code: 500, message: "Internal server error" });
   }
 };
-

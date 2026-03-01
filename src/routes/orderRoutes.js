@@ -18,7 +18,14 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  * /orders:
  *   post:
  *     summary: Create new order (FR_STAFF only)
- *     description: Create a new order with items (FR_STAFF only). Order will be in SUBMITTED status.
+ *     description: |
+ *       Create a new order with items (FR_STAFF only). Order will be in SUBMITTED status.
+ *       
+ *       **Validations:**
+ *       - delivery_date cannot be in the past
+ *       - delivery_date must be at least 5 days from today
+ *       - Must contain at least 1 item
+ *       - quantity and unit_price must be > 0
  *     tags: [Orders]
  *     security:
  *       - bearerAuth: []
@@ -35,12 +42,12 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *               delivery_date:
  *                 type: string
  *                 format: date
- *                 description: Expected delivery date (must be today or in the future)
- *                 example: "2026-02-25"
+ *                 description: Expected delivery date (must be today + 5 days or later)
+ *                 example: "2026-03-06"
  *               items:
  *                 type: array
  *                 minItems: 1
- *                 description: Order items (at least 1 item required, up to multiple items)
+ *                 description: Order items (at least 1 item required)
  *                 items:
  *                   type: object
  *                   required:
@@ -53,7 +60,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *                       description: Product ID
  *                       example: 2
  *                     quantity:
- *                       type: integer
+ *                       type: number
  *                       description: Order quantity (must be > 0)
  *                       example: 10
  *                     unit_price:
@@ -65,7 +72,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *             single_item:
  *               summary: Order with single item
  *               value:
- *                 delivery_date: "2026-02-25"
+ *                 delivery_date: "2026-03-06"
  *                 items:
  *                   - product_id: 2
  *                     quantity: 10
@@ -73,7 +80,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *             multiple_items:
  *               summary: Order with multiple items
  *               value:
- *                 delivery_date: "2026-02-25"
+ *                 delivery_date: "2026-03-06"
  *                 items:
  *                   - product_id: 2
  *                     quantity: 10
@@ -82,7 +89,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *                     quantity: 50
  *                     unit_price: 10000
  *     responses:
- *       201:
+ *       200:
  *         description: Order created successfully
  *         content:
  *           application/json:
@@ -104,7 +111,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *                       example: "ORD-1740244800000"
  *                     store_id:
  *                       type: integer
- *                       example: 5
+ *                       example: 2
  *                     order_date:
  *                       type: string
  *                       format: date-time
@@ -112,10 +119,10 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *                     delivery_date:
  *                       type: string
  *                       format: date
- *                       example: "2026-02-25"
+ *                       example: "2026-03-06"
  *                     status:
  *                       type: string
- *                       enum: [SUBMITTED, CONFIRMED, PARTIALLY_ISSUED, ISSUED, DELIVERED, CANCELLED]
+ *                       enum: [SUBMITTED, CONFIRMED, ISSUED, DELIVERED, CANCELLED]
  *                       description: Order status
  *                       example: SUBMITTED
  *                     total_amount:
@@ -135,6 +142,10 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *                       type: integer
  *                       nullable: true
  *                       description: User ID who issued the order
+ *                     received_by:
+ *                       type: integer
+ *                       nullable: true
+ *                       description: User ID who received/delivered the order
  *                     created_at:
  *                       type: string
  *                       format: date-time
@@ -157,7 +168,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *                             type: string
  *                             example: "Product A"
  *                           quantity:
- *                             type: integer
+ *                             type: number
  *                             example: 10
  *                           unit_price:
  *                             type: number
@@ -178,18 +189,15 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *             schema:
  *               type: object
  *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 code:
- *                   type: string
- *                   example: INVALID_ORDER
+ *                 error_code:
+ *                   type: integer
+ *                   example: 400
  *                 message:
  *                   type: string
  *                   examples:
  *                     - "Order must contain at least one item"
  *                     - "delivery_date cannot be in the past"
- *                     - "quantity and unit_price must be > 0"
+ *                     - "delivery_date must be at least 5 days from today"
  *       401:
  *         description: Unauthorized - Missing or invalid token
  *       403:
