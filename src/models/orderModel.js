@@ -238,6 +238,33 @@ exports.getById = async (orderId) => {
   return rows.length ? rows[0] : null;
 };
 
+
+/**
+ * Cancel an order (only SUBMITTED orders can be cancelled)
+ */
+exports.cancelOrder = async (orderId, cancelledBy) => {
+  const [result] = await pool.query(
+    `UPDATE Orders 
+     SET status = 'CANCELLED', updated_at = NOW(), cancelled_by = ?
+     WHERE id = ? AND status = 'SUBMITTED'`,
+    [cancelledBy, orderId]
+  );
+  
+  return result.affectedRows > 0;
+};
+
+/**
+ * Get order status
+ */
+exports.getOrderStatus = async (orderId) => {
+  const [rows] = await pool.query(
+    `SELECT id, status FROM Orders WHERE id = ?`,
+    [orderId]
+  );
+  
+  return rows.length > 0 ? rows[0] : null;
+};
+
 /**
  * Auto cancel orders after 2 days if still SUBMITTED
  */

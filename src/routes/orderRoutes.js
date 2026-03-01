@@ -508,4 +508,144 @@ router.patch(
   orderController.confirmOrder
 );
 
+/**
+ * @swagger
+ * /orders/{id}/cancel:
+ *   patch:
+ *     summary: Cancel an order (FR_STAFF/MANAGER only)
+ *     description: |
+ *       **FR_STAFF or MANAGER cancels an order.**
+ *       
+ *       **Restrictions:**
+ *       - Only orders in SUBMITTED status can be cancelled
+ *       - Cannot cancel CONFIRMED, ISSUED, or DELIVERED orders
+ *       - FR_STAFF can only cancel orders from their own store
+ *       - MANAGER can cancel orders from any store
+ *       - ADMIN can cancel orders from any store
+ *       
+ *       **Transition:** SUBMITTED → CANCELLED
+ *       
+ *       **Use Cases:**
+ *       - FR_STAFF realizes order was created by mistake
+ *       - FR_STAFF wants to modify order (cancel & create new one)
+ *       - MANAGER approves cancellation
+ *       
+ *       **Cannot Cancel If:**
+ *       ```
+ *        Order status is CONFIRMED (CK_STAFF already confirmed)
+ *        Order status is ISSUED (Goods already shipped)
+ *        Order status is DELIVERED (Already received)
+ *        Order status is CANCELLED (Already cancelled)
+ *       ```
+ *       
+ *       **Workflow Example:**
+ *       ```
+ *       Order #52: SUBMITTED
+ *       ├─ FR_STAFF realizes mistake
+ *       ├─ Cancel Order → SUBMITTED → CANCELLED 
+ *       └─ Create new Order
+ *       
+ *       OR
+ *       
+ *       Order #52: CONFIRMED (CK_STAFF confirmed)
+ *       ├─ FR_STAFF tries to cancel
+ *       └─ Error: Cannot cancel CONFIRMED order
+ *       ```
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Order ID to cancel
+ *         example: 52
+ *       - in: query
+ *         name: reason
+ *         schema:
+ *           type: string
+ *           description: Cancellation reason (optional, for audit trail)
+ *           example: "Created by mistake"
+ *     responses:
+ *       200:
+ *         description: Order cancelled successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 52
+ *                     order_code:
+ *                       type: string
+ *                       example: "ORD-1740244800000"
+ *                     store_id:
+ *                       type: integer
+ *                       example: 2
+ *                     status:
+ *                       type: string
+ *                       example: "CANCELLED"
+ *                     created_by:
+ *                       type: integer
+ *                       example: 10
+ *                     cancelled_by:
+ *                       type: integer
+ *                       description: User ID who cancelled the order
+ *                       example: 10
+ *                     updated_at:
+ *                       type: string
+ *                       format: date-time
+ *                 message:
+ *                   type: string
+ *                   example: "Order cancelled successfully"
+ *       400:
+ *         description: Cannot cancel order
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error_code:
+ *                   type: integer
+ *                   example: 400
+ *                 message:
+ *                   type: string
+ *                 error:
+ *                   type: string
+ *               examples:
+ *                 wrong_status:
+ *                   value:
+ *                     error_code: 400
+ *                     message: "Cannot cancel order"
+ *                     error: "Order can only be cancelled in SUBMITTED status. Current status: CONFIRMED"
+ *                 already_cancelled:
+ *                   value:
+ *                     error_code: 400
+ *                     message: "Cannot cancel order"
+ *                     error: "Order can only be cancelled in SUBMITTED status. Current status: CANCELLED"
+ *       401:
+ *         description: Unauthorized - Missing or invalid token
+ *       403:
+ *         description: Forbidden - User cannot cancel this order
+ *       404:
+ *         description: Order not found
+ *       500:
+ *         description: Internal server error
+ */
+router.patch(
+  "/orders/:id/cancel",
+  verifyToken,
+  requireRoles(["FR_STAFF", "MANAGER"]),
+  orderController.cancelOrder
+);
+
 module.exports = router;

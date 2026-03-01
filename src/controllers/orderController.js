@@ -380,3 +380,59 @@ exports.deliverOrder = async (req, res) => {
     return response.error(res, { code: 500, message: "Internal server error" });
   }
 };
+
+/**
+ * Cancel an order
+ * Only SUBMITTED orders can be cancelled
+ * Only FR_STAFF or MANAGER can cancel
+ */
+exports.cancelOrder = async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const user = req.user;
+
+    // 1. Check if order exists
+    const order = await orderModel.getOrderById(orderId);
+    if (!order || order.length === 0) {
+      return response.error(res, ERROR.NOT_FOUND, "Order not found");
+    }
+
+    // 2. Check if user has permission (must be from same store or MANAGER/ADMIN)
+    const orderStoreId = order[0].store_id;
+    if (user.store_id !== orderStoreId && user.role !== "ADMIN" && user.role !== "MANAGER") {
+      return response.error(res, ERROR.FORBIDDEN, "You cannot cancel orders from other stores");
+    }
+
+    // 3. Check order status (only SUBMITTED can be cancelled)
+    const orderStatus = order[0].status;
+    console.log(`[Order Cancel] Order ${orderId}: current status = ${orderStatus}`);
+
+    if (orderStatus !== "SUBMITTED") {
+      return response.error(
+        res,
+        { code: 400, message: "Cannot cancel order" },
+        `Order can only be cancelled in SUBMITTED status. Current status: ${orderStatus}`
+      );
+    }
+
+    // 4. Cancel the order
+    const affected = await orderModel.cancelOrder(orderId, user.id);
+    if (!affected) {
+      return response.error(
+        res,
+        { code: 400, message: "Cannot cancel order" },
+        "Failed to cancel order"
+      );
+    }
+
+    console.log(`[Order Cancel] ✅ Order ${orderId} cancelled by user ${user.id}`);
+
+    // 5. Get updated order
+    const updatedOrder = await orderModel.getOrderById(orderId);
+    return response.success(res, updatedOrder[0], "Order cancelled successfully");
+
+  } catch (err) {
+    console.error("[Order Cancel] Error:", err);
+    return response.error(res, ERROR.INTERNAL_ERROR);
+  }
+};
