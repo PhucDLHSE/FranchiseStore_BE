@@ -4,7 +4,7 @@ const inventoryModel = require("../models/inventoryModel");
 const orderModel = require("../models/orderModel");
 const response = require("../utils/response");
 const ERROR = require("../utils/errorCodes");
-const pool = require("../configs/database");  // ✅ Thêm import pool
+const pool = require("../configs/database");
 
 exports.create = async (req, res) => {
   try {
@@ -28,6 +28,95 @@ exports.create = async (req, res) => {
       }
     }
 
+    // ✅ Validate order and items match
+    if (order_id) {
+      try {
+        console.log(`[GI Create] Validating order ${order_id} and items`);
+        
+        // 1. Get order detail
+        const orderRows = await orderModel.getOrderById(order_id);
+        if (!orderRows || orderRows.length === 0) {
+          return response.error(
+            res,
+            { code: 404, message: "Order not found" },
+            `Order ${order_id} not found`
+          );
+        }
+
+        // 2. Check order status (must be CONFIRMED or ISSUED for partial delivery)
+        const orderStatus = orderRows[0].status;
+        if (orderStatus !== "CONFIRMED" && orderStatus !== "ISSUED") {
+          return response.error(
+            res,
+            { code: 400, message: "Invalid order status" },
+            `Order must be CONFIRMED or ISSUED (current: ${orderStatus})`
+          );
+        }
+
+        // 3. Extract order items (products with names)
+        const orderItems = {};
+        orderRows.forEach(row => {
+          if (row.order_item_id && row.product_id) {
+            if (!orderItems[row.product_id]) {
+              orderItems[row.product_id] = {
+                quantity: row.quantity,
+                product_name: row.product_name
+              };
+            }
+          }
+        });
+
+        console.log(`[GI Create] Order ${order_id} items:`, orderItems);
+
+        // 4. Validate GI items against order items
+        const giItems = {};
+        for (const item of items) {
+          // Check if product exists in order
+          if (!orderItems.hasOwnProperty(item.product_id)) {
+            // ✅ Get product name from database for better error message
+            // ✅ CHÚ Ý: Thay 'product_name' bằng tên cột thực tế (có thể là 'name')
+            const [productRows] = await pool.query(
+              `SELECT id, name FROM Product WHERE id = ?`,
+              [item.product_id]
+            );
+            
+            const productName = productRows.length ? productRows[0].name : `Product ${item.product_id}`;
+            
+            return response.error(
+              res,
+              { code: 400, message: "Invalid product in Goods Issue" },
+              `${productName} (ID: ${item.product_id}) is not in Order ${order_id}`
+            );
+          }
+          giItems[item.product_id] = item.quantity;
+        }
+
+        // 5. Validate quantity doesn't exceed order quantity
+        for (const productId in giItems) {
+          const giQty = giItems[productId];
+          const orderQty = orderItems[productId].quantity;
+          const productName = orderItems[productId].product_name;
+
+          if (giQty > orderQty) {
+            return response.error(
+              res,
+              { code: 400, message: "Quantity exceeds order" },
+              `${productName} (ID: ${productId}): GI quantity (${giQty}) exceeds order quantity (${orderQty})`
+            );
+          }
+        }
+
+        console.log(`[GI Create] ✅ Order items validation passed`);
+
+      } catch (orderErr) {
+        console.error("[GI Create] Error validating order:", orderErr);
+        if (orderErr.response) {
+          return orderErr.response; // Jika error sudah return response
+        }
+        return response.error(res, ERROR.INTERNAL_ERROR, "Error validating order");
+      }
+    }
+
     // ✅ Validate inventory before creating Goods Issue
     console.log(`[GI Create] Validating inventory for store ${user.store_id}`);
     
@@ -39,13 +128,21 @@ exports.create = async (req, res) => {
 
       const availableQuantity = inventory ? inventory.quantity : 0;
 
-      console.log(`[GI Create] Product ${item.product_id}: required=${item.quantity}, available=${availableQuantity}`);
+      // Get product name for better error message
+      // ✅ CHÚ Ý: Thay 'product_name' bằng tên cột thực tế
+      const [productRows] = await pool.query(
+        `SELECT name FROM Product WHERE id = ?`,
+        [item.product_id]
+      );
+      const productName = productRows.length ? productRows[0].name : `Product ${item.product_id}`;
+
+      console.log(`[GI Create] ${productName} (ID: ${item.product_id}): required=${item.quantity}, available=${availableQuantity}`);
 
       if (availableQuantity < item.quantity) {
         return response.error(
           res,
           { code: 400, message: "Insufficient inventory" },
-          `Insufficient stock for product ${item.product_id}. Required: ${item.quantity}, Available: ${availableQuantity}`
+          `Insufficient stock for ${productName} (ID: ${item.product_id}). Required: ${item.quantity}, Available: ${availableQuantity}`
         );
       }
     }
