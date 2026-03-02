@@ -78,11 +78,6 @@ const { requireCKStaff } = require("../middlewares/roleMiddleware");
  *             required:
  *               - items
  *             properties:
- *               order_id:
- *                 type: integer
- *                 nullable: true
- *                 description: ID of the related order (optional)
- *                 example: 5
  *               items:
  *                 type: array
  *                 minItems: 1
