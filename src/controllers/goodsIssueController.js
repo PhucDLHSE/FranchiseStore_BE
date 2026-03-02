@@ -73,8 +73,6 @@ exports.create = async (req, res) => {
         for (const item of items) {
           // Check if product exists in order
           if (!orderItems.hasOwnProperty(item.product_id)) {
-            // ✅ Get product name from database for better error message
-            // ✅ CHÚ Ý: Thay 'product_name' bằng tên cột thực tế (có thể là 'name')
             const [productRows] = await pool.query(
               `SELECT id, name FROM Product WHERE id = ?`,
               [item.product_id]
@@ -91,17 +89,59 @@ exports.create = async (req, res) => {
           giItems[item.product_id] = item.quantity;
         }
 
-        // 5. Validate quantity doesn't exceed order quantity
+        // 5. ✅ NEW: Get all existing GI for this order (to check total)
+        console.log(`[GI Create] Checking existing GI for order ${order_id}`);
+        const existingGI = await giModel.getByOrderId(order_id);
+        
+        // Calculate total GI quantity per product
+        const totalGIByProduct = {};
+        if (existingGI && existingGI.length > 0) {
+          for (const gi of existingGI) {
+            if (gi.items) {
+              for (const item of gi.items) {
+                if (!totalGIByProduct[item.product_id]) {
+                  totalGIByProduct[item.product_id] = 0;
+                }
+                totalGIByProduct[item.product_id] += item.quantity;
+              }
+            }
+          }
+        }
+
+        console.log(`[GI Create] Existing GI quantities per product:`, totalGIByProduct);
+
+        // 6. ✅ Validate new GI quantity doesn't exceed order quantity
         for (const productId in giItems) {
-          const giQty = giItems[productId];
+          const newGIQty = giItems[productId];
           const orderQty = orderItems[productId].quantity;
+          const existingGIQty = totalGIByProduct[productId] || 0;
+          const totalWillBe = existingGIQty + newGIQty;
           const productName = orderItems[productId].product_name;
 
-          if (giQty > orderQty) {
+          console.log(
+            `[GI Create] Product ${productName} (${productId}): ` +
+            `order=${orderQty}, ` +
+            `existing_gi=${existingGIQty}, ` +
+            `new_gi=${newGIQty}, ` +
+            `total_will_be=${totalWillBe}`
+          );
+
+          // Check new GI quantity
+          if (newGIQty > orderQty) {
             return response.error(
               res,
               { code: 400, message: "Quantity exceeds order" },
-              `${productName} (ID: ${productId}): GI quantity (${giQty}) exceeds order quantity (${orderQty})`
+              `${productName} (ID: ${productId}): GI quantity (${newGIQty}) exceeds order quantity (${orderQty})`
+            );
+          }
+
+          // ✅ Check total GI quantity across all GI doesn't exceed order
+          if (totalWillBe > orderQty) {
+            return response.error(
+              res,
+              { code: 400, message: "Total GI quantity exceeds order" },
+              `${productName} (ID: ${productId}): Total GI quantity (${existingGIQty} + ${newGIQty} = ${totalWillBe}) exceeds order quantity (${orderQty}). ` +
+              `Remaining available: ${orderQty - existingGIQty}`
             );
           }
         }
@@ -111,7 +151,7 @@ exports.create = async (req, res) => {
       } catch (orderErr) {
         console.error("[GI Create] Error validating order:", orderErr);
         if (orderErr.response) {
-          return orderErr.response; // Jika error sudah return response
+          return orderErr.response;
         }
         return response.error(res, ERROR.INTERNAL_ERROR, "Error validating order");
       }
@@ -128,8 +168,6 @@ exports.create = async (req, res) => {
 
       const availableQuantity = inventory ? inventory.quantity : 0;
 
-      // Get product name for better error message
-      // ✅ CHÚ Ý: Thay 'product_name' bằng tên cột thực tế
       const [productRows] = await pool.query(
         `SELECT name FROM Product WHERE id = ?`,
         [item.product_id]
@@ -163,6 +201,7 @@ exports.create = async (req, res) => {
     return response.error(res, ERROR.INTERNAL_ERROR);
   }
 };
+
 
 exports.complete = async (req, res) => {
   try {

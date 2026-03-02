@@ -95,16 +95,44 @@ exports.listByStore = async (storeId) => {
 };
 
 /**
- * Check if order already has an existing Goods Issue
+ * Get all GI by order ID (including items)
  */
 exports.getByOrderId = async (orderId) => {
   const [rows] = await pool.query(
-    `SELECT * FROM GoodsIssue
-     WHERE order_id = ? AND status != 'CANCELLED'
-     LIMIT 1`,
+    `SELECT gi.*, gii.product_id, gii.quantity
+     FROM GoodsIssue gi
+     LEFT JOIN GoodsIssueItem gii ON gi.id = gii.goods_issue_id
+     WHERE gi.order_id = ? AND gi.status IN ('CREATED', 'COMPLETED')
+     ORDER BY gi.id, gii.id`,
     [orderId]
   );
-  return rows.length ? rows[0] : null;
+
+  if (rows.length === 0) return [];
+
+  // Group by GI ID
+  const giMap = {};
+  for (const row of rows) {
+    if (!giMap[row.id]) {
+      giMap[row.id] = {
+        id: row.id,
+        order_id: row.order_id,
+        store_from: row.store_from,
+        store_to: row.store_to,
+        status: row.status,
+        created_at: row.created_at,
+        items: []
+      };
+    }
+    
+    if (row.product_id) {
+      giMap[row.id].items.push({
+        product_id: row.product_id,
+        quantity: row.quantity
+      });
+    }
+  }
+
+  return Object.values(giMap);
 };
 
 exports.generateReceipt = async (issueId) => {
