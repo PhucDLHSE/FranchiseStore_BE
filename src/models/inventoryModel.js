@@ -3,36 +3,10 @@ const pool = require("../configs/database");
 /**
  * Get inventory list by store (with filters)
  */
-exports.findByStore = async ({
-  storeId,
-  keyword,
-  category_id,
-  product_type,
-  low_stock
-}) => {
-  const conditions = ["i.store_id = ?"];
-  const values = [storeId];
+exports.findByStore = async (filters = {}) => {
+  const { storeId, keyword, category_id, low_stock } = filters;
 
-  if (keyword) {
-    conditions.push("(p.name LIKE ? OR p.sku LIKE ?)");
-    values.push(`%${keyword}%`, `%${keyword}%`);
-  }
-
-  if (category_id) {
-    conditions.push("p.category_id = ?");
-    values.push(category_id);
-  }
-
-  if (product_type) {
-    conditions.push("p.product_type = ?");
-    values.push(product_type);
-  }
-
-  if (low_stock === "true") {
-    conditions.push("(i.quantity - i.reserved_quantity) <= 10");
-  }
-
-  const sql = `
+  let query = `
     SELECT 
       i.id,
       i.store_id,
@@ -40,7 +14,6 @@ exports.findByStore = async ({
       p.name,
       p.sku,
       p.uom,
-      p.product_type,
       p.category_id,
       i.quantity,
       i.reserved_quantity,
@@ -48,15 +21,32 @@ exports.findByStore = async ({
       i.updated_at
     FROM Inventory i
     JOIN Product p ON i.product_id = p.id
-    WHERE ${conditions.join(" AND ")}
+    WHERE i.store_id = ?
       AND p.deleted_at IS NULL
-    ORDER BY p.name ASC
   `;
 
-  const [rows] = await pool.query(sql, values);
+  const params = [storeId];
+
+  if (keyword) {
+    query += ` AND (p.name LIKE ? OR p.sku LIKE ?)`;
+    const searchTerm = `%${keyword}%`;
+    params.push(searchTerm, searchTerm);
+  }
+
+  if (category_id) {
+    query += ` AND p.category_id = ?`;
+    params.push(category_id);
+  }
+
+  if (low_stock === "true" || low_stock === true) {
+    query += ` AND i.quantity < 10`;
+  }
+
+  query += ` ORDER BY p.name ASC`;
+
+  const [rows] = await pool.query(query, params);
   return rows;
 };
-
 /**
  * Get single inventory item
  */
