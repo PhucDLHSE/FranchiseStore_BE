@@ -8,7 +8,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  * @swagger
  * tags:
  *   name: Product Recipe
- *   description: API quản lý công thức sản xuất sản phẩm
+ *   description: Product Recipe Management (Manager only)
  */
 
 // ==================== CREATE RECIPE ====================
@@ -17,15 +17,15 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  * @swagger
  * /api/product-recipes:
  *   post:
- *     summary: Tạo công thức sản xuất mới + Tự động tạo Product
+ *     summary: Create a new product recipe + Auto-create Product
  *     description: |
- *       Tạo một công thức sản xuất mới. Hệ thống sẽ tự động tạo một sản phẩm (Product) tương ứng.
+ *       Create a new product recipe. The system will automatically create a corresponding product (Product).
  *       
  *       **Flow:**
- *       1. Tạo ProductRecipe (product_id = NULL ban đầu)
- *       2. Tạo Product (liên kết với recipe_id vừa tạo)
- *       3. Update ProductRecipe với product_id vừa tạo
- *       4. Thêm các RecipeIngredient
+ *       1. Create ProductRecipe (product_id = NULL initially)
+ *       2. Create Product (linked with the newly created recipe_id)
+ *       3. Update ProductRecipe with the newly created product_id
+ *       4. Add RecipeIngredients
  *     tags:
  *       - Product Recipe
  *     security:
@@ -106,7 +106,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *                     notes: "Đường tinh luyện"
  *     responses:
  *       201:
- *         description: Công thức được tạo thành công + Product auto-created
+ *         description: Product recipe created successfully + Product auto-created
  *         content:
  *           application/json:
  *             schema:
@@ -177,11 +177,11 @@ router.post(
  * @swagger
  * /api/product-recipes:
  *   get:
- *     summary: Lấy danh sách công thức
+ *     summary: Get all product recipes
  *     description: |
- *       Lấy danh sách tất cả công thức sản xuất. Hỗ trợ lọc và tìm kiếm.
+ *       Get a list of all product recipes. Supports filtering and searching.
  *       
- *       **Các filter có thể kết hợp:**
+ *       **Filters can be combined:**
  *       - status=ACTIVE&category_id=1
  *       - status=INACTIVE&search=bánh
  *       - product_id=23
@@ -195,29 +195,29 @@ router.post(
  *         schema:
  *           type: integer
  *         example: 1
- *         description: Lọc theo ID danh mục sản phẩm
+ *         description: Filter by product category ID
  *       - name: product_id
  *         in: query
  *         schema:
  *           type: integer
  *         example: 23
- *         description: Lọc theo ID sản phẩm
+ *         description: Filter by product ID
  *       - name: status
  *         in: query
  *         schema:
  *           type: string
  *           enum: [ACTIVE, INACTIVE]
  *         example: ACTIVE
- *         description: Lọc theo trạng thái công thức
+ *         description: Filter by recipe status
  *       - name: search
  *         in: query
  *         schema:
  *           type: string
  *         example: "bánh mì"
- *         description: Tìm kiếm theo tên công thức, tên sản phẩm, hoặc mã công thức (recipe_code)
+ *         description: Search by recipe name, product name, or recipe code (recipe_code)
  *     responses:
  *       200:
- *         description: Danh sách công thức
+ *         description: List of product recipes
  *         content:
  *           application/json:
  *             schema:
@@ -234,7 +234,7 @@ router.post(
  *                   type: integer
  *                   example: 5
  *       401:
- *         description: Không được phép (chưa xác thực)
+ *         description: Unauthorized (not authenticated)
  */
 router.get(
   "/product-recipes",
@@ -248,18 +248,18 @@ router.get(
  * @swagger
  * /api/product-recipes/active:
  *   get:
- *     summary: Lấy danh sách công thức đang hoạt động
+ *     summary: Get active product recipes
  *     description: |
- *       Lấy danh sách công thức có status = ACTIVE.
+ *       Get a list of product recipes with status = ACTIVE.
  *       
- *       **Note:** Route này phải được định nghĩa TRƯỚC /:id để tránh xung đột routing.
+ *       **Note:** This route must be defined BEFORE /:id to avoid routing conflicts.
  *     tags:
  *       - Product Recipe
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Danh sách công thức ACTIVE
+ *         description: List of active product recipes
  *         content:
  *           application/json:
  *             schema:
@@ -273,7 +273,7 @@ router.get(
  *                   items:
  *                     $ref: '#/components/schemas/ProductRecipeDetail'
  *       401:
- *         description: Không được phép (chưa xác thực)
+ *         description: Unauthorized (not authenticated)
  */
 router.get(
   "/product-recipes/active",
@@ -287,9 +287,9 @@ router.get(
  * @swagger
  * /api/product-recipes/category/{category_id}:
  *   get:
- *     summary: Lấy công thức theo danh mục
+ *     summary: Get product recipes by category
  *     description: |
- *       Lấy danh sách công thức của một danh mục sản phẩm cụ thể.
+ *       Get a list of product recipes for a specific product category.
  *     tags:
  *       - Product Recipe
  *     security:
@@ -301,10 +301,10 @@ router.get(
  *         schema:
  *           type: integer
  *         example: 1
- *         description: ID danh mục sản phẩm
+ *         description: Product category ID
  *     responses:
  *       200:
- *         description: Danh sách công thức của danh mục
+ *         description: List of product recipes for the category
  *         content:
  *           application/json:
  *             schema:
@@ -318,9 +318,9 @@ router.get(
  *                   items:
  *                     $ref: '#/components/schemas/ProductRecipeDetail'
  *       401:
- *         description: Không được phép (chưa xác thực)
+ *         description: Unauthorized (not authenticated)
  *       404:
- *         description: Danh mục không tồn tại
+ *         description: Category not found
  */
 router.get(
   "/product-recipes/category/:category_id",
@@ -334,13 +334,13 @@ router.get(
  * @swagger
  * /api/product-recipes/{id}:
  *   get:
- *     summary: Lấy chi tiết công thức
+ *     summary: Get product recipe details  
  *     description: |
- *       Lấy thông tin chi tiết của một công thức bao gồm:
- *       - Thông tin công thức (recipe_code, name, yield, status, etc.)
- *       - Thông tin sản phẩm liên kết (product_name, product_sku, category, etc.)
- *       - Danh sách tất cả nguyên liệu với chi tiết
- *       - Thông tin người tạo
+ *       Get detailed information of a product recipe, including:
+ *       - Recipe information (recipe_code, name, yield, status, etc.)
+ *       - Linked product information (product_name, product_sku, category, etc.)
+ *       - List of all ingredients with details
+ *       - Creator information
  *     tags:
  *       - Product Recipe
  *     security:
@@ -352,10 +352,10 @@ router.get(
  *         schema:
  *           type: integer
  *         example: 5
- *         description: ID công thức
+ *         description: Product recipe ID
  *     responses:
  *       200:
- *         description: Chi tiết công thức
+ *         description: Product recipe details
  *         content:
  *           application/json:
  *             schema:
@@ -367,9 +367,9 @@ router.get(
  *                 data:
  *                   $ref: '#/components/schemas/ProductRecipeDetail'
  *       401:
- *         description: Không được phép (chưa xác thực)
+ *         description: Unauthorized (not authenticated)
  *       404:
- *         description: Công thức không tồn tại
+ *         description: Product recipe not found
  *         content:
  *           application/json:
  *             schema:
@@ -387,14 +387,14 @@ router.get(
  * @swagger
  * /api/product-recipes/{id}:
  *   patch:
- *     summary: Cập nhật công thức và nguyên liệu
+ *     summary: Update product recipe and ingredients
  *     description: |
- *       Cập nhật thông tin công thức và/hoặc danh sách nguyên liệu.
+ *       Update product recipe information and/or ingredient list.
  *       
- *       **Lưu ý:**
- *       - Có thể update riêng (name, yield_quantity, yield_unit, status)
- *       - Hoặc update ingredients (sẽ xóa tất cả cũ, thêm mới toàn bộ)
- *       - Hoặc cập nhật cả hai cùng lúc
+ *       **Note:**
+ *       - Can update only recipe info (name, yield_quantity, yield_unit, status)
+ *       - Or update ingredients (will delete all old ones and add new ones)
+ *       - Or update both at the same time
  *     tags:
  *       - Product Recipe
  *     security:
@@ -406,7 +406,7 @@ router.get(
  *         schema:
  *           type: integer
  *         example: 5
- *         description: ID công thức
+ *         description: Product recipe ID
  *     requestBody:
  *       required: true
  *       content:
@@ -417,24 +417,24 @@ router.get(
  *               name:
  *                 type: string
  *                 example: "Bánh mì ngọt - Formula v2"
- *                 description: Tên công thức (tuỳ chọn)
+ *                 description: Product recipe name (optional, max 255 characters)
  *               yield_quantity:
  *                 type: number
  *                 format: decimal
  *                 example: 1.5
- *                 description: Số lượng output (tuỳ chọn, phải > 0)
+ *                 description: Output quantity (optional, must be > 0)
  *               yield_unit:
  *                 type: string
  *                 example: "PC"
- *                 description: Đơn vị output (tuỳ chọn)
+ *                 description: Output unit (optional)
  *               status:
  *                 type: string
  *                 enum: [ACTIVE, INACTIVE]
  *                 example: "ACTIVE"
- *                 description: Trạng thái công thức (tuỳ chọn)
+ *                 description: Recipe status (optional)
  *               ingredients:
  *                 type: array
- *                 description: Danh sách nguyên liệu (thay thế toàn bộ - tuỳ chọn)
+ *                 description: List of ingredients (replace all - optional)
  *                 minItems: 1
  *                 items:
  *                   type: object
@@ -446,27 +446,27 @@ router.get(
  *                     material_id:
  *                       type: integer
  *                       example: 1
- *                       description: ID vật liệu
+ *                       description: Material ID (must exist in Material table)
  *                     quantity:
  *                       type: number
  *                       example: 150
- *                       description: Số lượng vật liệu (phải > 0)
+ *                       description: Material quantity (must be > 0)
  *                     quantity_unit:
  *                       type: string
  *                       example: "G"
- *                       description: Đơn vị vật liệu
+ *                       description: Material unit (G, KG, ML, L, PC, etc.)
  *                     notes:
  *                       type: string
  *                       example: "Bột mì - tăng lên"
  *                       description: Ghi chú (tuỳ chọn)
  *           examples:
  *             update_info_only:
- *               summary: Chỉ cập nhật thông tin
+ *               summary: Update recipe information only
  *               value:
  *                 name: "Bánh mì ngọt v2"
  *                 yield_quantity: 1.5
  *             update_ingredients_only:
- *               summary: Chỉ cập nhật nguyên liệu
+ *               summary: Update ingredients only
  *               value:
  *                 ingredients:
  *                   - material_id: 1
@@ -478,7 +478,7 @@ router.get(
  *                     quantity_unit: "G"
  *                     notes: "Đường - tăng"
  *             update_all:
- *               summary: Cập nhật cả thông tin và nguyên liệu
+ *               summary: Update both recipe information and ingredients
  *               value:
  *                 name: "Bánh mì ngọt v2"
  *                 yield_quantity: 1.5
@@ -492,7 +492,7 @@ router.get(
  *                     quantity_unit: "G"
  *     responses:
  *       200:
- *         description: Công thức được cập nhật thành công
+ *         description: Product recipe updated successfully
  *         content:
  *           application/json:
  *             schema:
@@ -510,14 +510,14 @@ router.get(
  *                   type: string
  *                   example: "Recipe \"Bánh mì ngọt v2\" updated successfully"
  *       400:
- *         description: Dữ liệu không hợp lệ
+ *         description: Invalid data
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *             examples:
  *               invalid_quantity:
- *                 summary: Số lượng không hợp lệ
+ *                 summary: Invalid quantity
  *                 value:
  *                   success: false
  *                   error_code: 400
@@ -529,9 +529,9 @@ router.get(
  *                   error_code: 400
  *                   message: "Material duplicated"
  *       401:
- *         description: Không được phép (chưa xác thực hoặc không đủ quyền)
+ *         description: Unauthorized (not authenticated or insufficient permissions)
  *       404:
- *         description: Công thức không tồn tại
+ *         description: Product recipe not found!
  */
 router.patch(
   "/product-recipes/:id",
@@ -546,15 +546,15 @@ router.patch(
  * @swagger
  * /api/product-recipes/{id}:
  *   delete:
- *     summary: Xóa mềm công thức (Soft Delete)
+ *     summary: Soft delete product recipe
  *     description: |
- *       Xóa mềm (soft delete) công thức bằng cách đánh dấu status = INACTIVE và set deleted_at.
+ *       Soft delete a product recipe by setting status = INACTIVE and deleted_at.
  *       
- *       **Lưu ý:**
- *       - Dữ liệu không bị xóa vật lý, còn được giữ trong database
- *       - Công thức sẽ không xuất hiện trong các query bình thường
- *       - Có thể khôi phục lại bằng API /restore
- *       - Không thể xóa recipe đã INACTIVE
+ *       **Note:**
+ *       - Data is not physically deleted, it is still kept in the database
+ *       - The recipe will not appear in normal queries
+ *       - Can be restored using the /restore API
+ *       - Cannot delete a recipe that is already INACTIVE
  *     tags:
  *       - Product Recipe
  *     security:
@@ -566,10 +566,10 @@ router.patch(
  *         schema:
  *           type: integer
  *         example: 5
- *         description: ID công thức
+ *         description: Product recipe ID
  *     responses:
  *       200:
- *         description: Công thức được xóa thành công
+ *         description: Product recipe deleted successfully
  *         content:
  *           application/json:
  *             schema:
@@ -591,22 +591,22 @@ router.patch(
  *                   type: string
  *                   example: "Recipe \"Bánh mì ngọt\" has been deactivated/deleted"
  *       400:
- *         description: Công thức đã được xóa trước đó
+ *         description: Recipe has already been deleted
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *             examples:
  *               already_deleted:
- *                 summary: Recipe đã deleted
+ *                 summary: Recipe already deleted
  *                 value:
  *                   success: false
  *                   error_code: 400
  *                   message: "Recipe \"Bánh mì ngọt\" already inactive/deleted"
  *       401:
- *         description: Không được phép (chưa xác thực hoặc không đủ quyền)
+ *         description: Unauthorized (not authenticated or insufficient permissions)
  *       404:
- *         description: Công thức không tồn tại
+ *         description: Product recipe not found!
  */
 router.delete(
   "/product-recipes/:id",
@@ -621,14 +621,14 @@ router.delete(
  * @swagger
  * /api/product-recipes/{id}/restore:
  *   patch:
- *     summary: Khôi phục công thức đã xóa
+ *     summary: Restore deleted product recipe
  *     description: |
- *       Khôi phục công thức đã bị xóa mềm (soft delete).
+ *       Restore a soft-deleted product recipe.
  *       
- *       **Lưu ý:**
- *       - Chỉ khôi phục được recipe có deleted_at != NULL
- *       - Sẽ set status = ACTIVE, deleted_at = NULL
- *       - Không thể khôi phục recipe đang ACTIVE
+ *       **Note:**
+ *       - Can only restore recipes with deleted_at != NULL
+ *       - Will set status = ACTIVE, deleted_at = NULL
+ *       - Cannot restore a recipe that is already ACTIVE
  *     tags:
  *       - Product Recipe
  *     security:
@@ -640,10 +640,10 @@ router.delete(
  *         schema:
  *           type: integer
  *         example: 5
- *         description: ID công thức
+ *         description: Product recipe ID
  *     responses:
  *       200:
- *         description: Công thức được khôi phục thành công
+ *         description: Product recipe restored successfully
  *         content:
  *           application/json:
  *             schema:
@@ -661,16 +661,16 @@ router.delete(
  *                   type: string
  *                   example: "Recipe \"Bánh mì ngọt\" has been restored successfully"
  *       401:
- *         description: Không được phép (chưa xác thực hoặc không đủ quyền)
+ *         description: Unauthorized (not authenticated or insufficient permissions)
  *       404:
- *         description: Công thức không tồn tại hoặc không bị xóa
+ *         description: Product recipe not found or not deleted
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *             examples:
  *               not_deleted:
- *                 summary: Recipe không bị deleted
+ *                 summary: Recipe not deleted
  *                 value:
  *                   success: false
  *                   error_code: 404
@@ -689,14 +689,14 @@ router.patch(
  * @swagger
  * /api/product-recipes/{id}/ingredients:
  *   post:
- *     summary: Thêm nguyên liệu vào công thức
+ *     summary: Add ingredient to product recipe
  *     description: |
- *       Thêm một nguyên liệu mới vào công thức đã tồn tại.
+ *       Add a new ingredient to an existing product recipe.
  *       
- *       **Lưu ý:**
- *       - Chỉ thêm được vào recipe ACTIVE
- *       - Không thể thêm vật liệu trùng lặp
- *       - Tự động validate đơn vị tương thích
+ *       **Note:**
+ *       - Can only add to ACTIVE recipes
+ *       - Cannot add duplicate ingredients
+ *       - Automatically validates compatible units
  *     tags:
  *       - Product Recipe
  *     security:
@@ -708,7 +708,7 @@ router.patch(
  *         schema:
  *           type: integer
  *         example: 5
- *         description: ID công thức
+ *         description: Product recipe ID
  *     requestBody:
  *       required: true
  *       content:
@@ -723,22 +723,22 @@ router.patch(
  *               material_id:
  *                 type: integer
  *                 example: 3
- *                 description: ID vật liệu (phải tồn tại)
+ *                 description: Material ID (must exist)
  *               quantity:
  *                 type: number
  *                 example: 50
- *                 description: Số lượng (phải > 0)
+ *                 description: Quantity (must be > 0)
  *               quantity_unit:
  *                 type: string
  *                 example: "G"
- *                 description: Đơn vị vật liệu
+ *                 description: Material unit (G, KG, ML, L, PC, etc.)
  *               notes:
  *                 type: string
  *                 example: "Muối - new ingredient"
- *                 description: Ghi chú (tuỳ chọn)
+ *                 description: Notes (optional)
  *           examples:
  *             basic:
- *               summary: Ví dụ cơ bản
+ *               summary: Basic example
  *               value:
  *                 material_id: 3
  *                 quantity: 50
@@ -746,7 +746,7 @@ router.patch(
  *                 notes: "Muối - salt"
  *     responses:
  *       201:
- *         description: Nguyên liệu được thêm thành công
+ *         description: Ingredient added successfully
  *         content:
  *           application/json:
  *             schema:
@@ -780,28 +780,28 @@ router.patch(
  *                   type: string
  *                   example: "Ingredient \"Muối\" added successfully"
  *       400:
- *         description: Dữ liệu không hợp lệ
+ *         description: Invalid data
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *             examples:
  *               missing_field:
- *                 summary: Thiếu trường
+ *                 summary: Missing fields
  *                 value:
  *                   success: false
  *                   error_code: 400
  *                   message: "material_id, quantity, quantity_unit are required"
  *               duplicate:
- *                 summary: Vật liệu trùng lặp
+ *                 summary: Duplicate ingredient
  *                 value:
  *                   success: false
  *                   error_code: 400
  *                   message: "Ingredient already exists in this recipe"
  *       401:
- *         description: Không được phép (chưa xác thực hoặc không đủ quyền)
+ *         description: Unauthorized (not authenticated or insufficient permissions)
  *       404:
- *         description: Công thức hoặc vật liệu không tồn tại
+ *         description: Product recipe or material not found
  */
 router.post(
   "/product-recipes/:id/ingredients",
@@ -816,14 +816,14 @@ router.post(
  * @swagger
  * /api/product-recipes/{recipe_id}/ingredients/{ingredient_id}:
  *   patch:
- *     summary: Cập nhật nguyên liệu trong công thức
+ *     summary: Update an ingredient in a product recipe
  *     description: |
- *       Cập nhật số lượng, đơn vị, hoặc ghi chú của một nguyên liệu.
+ *       Update the quantity, unit, or notes of an ingredient.
  *       
- *       **Lưu ý:**
- *       - Có thể update riêng quantity, quantity_unit, hoặc notes
- *       - Không thể đổi material_id (phải xóa rồi thêm mới)
- *       - Tự động validate đơn vị tương thích
+ *       **Note:**
+ *       - You can update quantity, quantity_unit, or notes individually
+ *       - Cannot change material_id (must delete and add new)
+ *       - Automatically validates compatible units
  *     tags:
  *       - Product Recipe
  *     security:
@@ -835,14 +835,14 @@ router.post(
  *         schema:
  *           type: integer
  *         example: 5
- *         description: ID công thức
+ *         description: Product recipe ID
  *       - name: ingredient_id
  *         in: path
  *         required: true
  *         schema:
  *           type: integer
  *         example: 10
- *         description: ID nguyên liệu
+ *         description: Ingredient ID
  *     requestBody:
  *       required: true
  *       content:
@@ -853,29 +853,29 @@ router.post(
  *               quantity:
  *                 type: number
  *                 example: 120
- *                 description: Số lượng mới (tuỳ chọn, phải > 0)
+ *                 description: New quantity (optional, must be > 0)
  *               quantity_unit:
  *                 type: string
  *                 example: "G"
- *                 description: Đơn vị mới (tuỳ chọn)
+ *                 description: New unit (optional)
  *               notes:
  *                 type: string
  *                 example: "Bột mì loại 2 - chất lượng cao"
- *                 description: Ghi chú mới (tuỳ chọn)
+ *                 description: New notes (optional)
  *           examples:
  *             update_quantity:
- *               summary: Chỉ cập nhật số lượng
+ *               summary: Update only quantity
  *               value:
  *                 quantity: 120
  *             update_all:
- *               summary: Cập nhật tất cả
+ *               summary: Update all fields
  *               value:
  *                 quantity: 120
  *                 quantity_unit: "G"
  *                 notes: "Bột mì - chất lượng cao"
  *     responses:
  *       200:
- *         description: Nguyên liệu được cập nhật thành công
+ *         description: Ingredient updated successfully
  *         content:
  *           application/json:
  *             schema:
@@ -906,11 +906,11 @@ router.post(
  *                   type: string
  *                   example: "Ingredient updated successfully"
  *       400:
- *         description: Dữ liệu không hợp lệ
+ *         description: Invalid data
  *       401:
- *         description: Không được phép (chưa xác thực hoặc không đủ quyền)
+ *         description: Unauthorized (not authenticated or insufficient permissions)
  *       404:
- *         description: Công thức hoặc nguyên liệu không tồn tại
+ *         description: Product recipe or ingredient not found
  */
 router.patch(
   "/product-recipes/:recipe_id/ingredients/:ingredient_id",
@@ -925,14 +925,14 @@ router.patch(
  * @swagger
  * /api/product-recipes/{recipe_id}/ingredients/{ingredient_id}:
  *   delete:
- *     summary: Xóa nguyên liệu khỏi công thức
+ *     summary: Delete an ingredient from a product recipe
  *     description: |
- *       Xóa một nguyên liệu khỏi công thức.
+ *       Delete an ingredient from a product recipe.
  *       
- *       **Lưu ý:**
- *       - Chỉ xóa được nếu công thức còn có ít nhất 1 nguyên liệu khác
- *       - Hay nói cách khác, công thức phải có tối thiểu 1 nguyên liệu
- *       - Xóa vật lý (hard delete) khỏi RecipeIngredient table
+ *       **Note:**
+ *       - Can only delete if the recipe has at least 1 other ingredient
+ *       - In other words, the recipe must have at least 1 ingredient
+ *       - Hard delete from RecipeIngredient table
  *     tags:
  *       - Product Recipe
  *     security:
@@ -944,17 +944,17 @@ router.patch(
  *         schema:
  *           type: integer
  *         example: 5
- *         description: ID công thức
+ *         description: Product recipe ID
  *       - name: ingredient_id
  *         in: path
  *         required: true
  *         schema:
  *           type: integer
  *         example: 10
- *         description: ID nguyên liệu
+ *         description: Ingredient ID
  *     responses:
  *       200:
- *         description: Nguyên liệu được xóa thành công
+ *         description: Ingredient deleted successfully
  *         content:
  *           application/json:
  *             schema:
@@ -976,22 +976,22 @@ router.patch(
  *                   type: string
  *                   example: "Ingredient \"Bột mì\" deleted successfully"
  *       400:
- *         description: Không thể xóa (công thức sẽ không còn nguyên liệu)
+ *         description: Cannot delete (recipe will have no ingredients)
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *             examples:
  *               last_ingredient:
- *                 summary: Đây là nguyên liệu cuối cùng
+ *                 summary: This is the last ingredient
  *                 value:
  *                   success: false
  *                   error_code: 400
  *                   message: "Cannot delete last ingredient. Recipe must have at least 1 ingredient"
  *       401:
- *         description: Không được phép (chưa xác thực hoặc không đủ quyền)
+ *         description: Unauthorized (not authenticated or insufficient permissions)
  *       404:
- *         description: Công thức hoặc nguyên liệu không tồn tại
+ *         description: Product recipe or ingredient not found
  */
 router.delete(
   "/product-recipes/:recipe_id/ingredients/:ingredient_id",
@@ -1010,88 +1010,88 @@ module.exports = router;
  *   schemas:
  *     ProductRecipeDetail:
  *       type: object
- *       description: Chi tiết công thức sản xuất đầy đủ
+ *       description: Detailed product recipe information
  *       properties:
  *         id:
  *           type: integer
  *           example: 5
- *           description: ID công thức
+ *           description: Product recipe ID
  *         recipe_code:
  *           type: string
  *           example: "PR-20260302-9895"
- *           description: Mã công thức (auto-generated, unique)
+ *           description: Recipe code (auto-generated, unique)
  *         product_id:
  *           type: integer
  *           example: 23
- *           description: ID sản phẩm liên kết
+ *           description: Linked product ID
  *         name:
  *           type: string
  *           example: "Bánh mì ngọt"
- *           description: Tên công thức
+ *           description: Recipe name
  *         yield_quantity:
  *           type: string
  *           example: "1.00"
- *           description: Số lượng output
+ *           description: Output quantity
  *         yield_unit:
  *           type: string
  *           example: "PC"
- *           description: Đơn vị output
+ *           description: Output unit
  *         status:
  *           type: string
  *           enum: [ACTIVE, INACTIVE]
  *           example: "ACTIVE"
- *           description: Trạng thái công thức (ACTIVE/INACTIVE)
+ *           description: Recipe status (ACTIVE/INACTIVE)
  *         created_by:
  *           type: integer
  *           example: 8
- *           description: ID người tạo
+ *           description: ID of the creator
  *         created_at:
  *           type: string
  *           format: date-time
  *           example: "2026-03-02T11:53:45.000Z"
- *           description: Ngày tạo
+ *           description: Creation date
  *         updated_at:
  *           type: string
  *           format: date-time
  *           example: "2026-03-02T11:53:46.000Z"
- *           description: Ngày cập nhật cuối
+ *           description: Last update date
  *         deleted_at:
  *           type: string
  *           format: date-time
  *           nullable: true
  *           example: null
- *           description: Ngày xóa (soft delete)
+ *           description: Deletion date (soft delete)
  *         product_name:
  *           type: string
  *           example: "Bánh mì ngọt"
- *           description: Tên sản phẩm liên kết
+ *           description: Linked product name
  *         product_sku:
  *           type: string
  *           example: "SKU-PR-20260302-9895"
- *           description: SKU sản phẩm
+ *           description: Product SKU
  *         product_uom:
  *           type: string
  *           example: "PC"
- *           description: Đơn vị sản phẩm
+ *           description: Product unit of measure
  *         category_id:
  *           type: integer
  *           example: 1
- *           description: ID danh mục
+ *           description: Category ID
  *         category_name:
  *           type: string
  *           example: "BREAD"
- *           description: Tên danh mục
+ *           description: Category name
  *         created_by_name:
  *           type: string
  *           example: "Manager Phúc"
- *           description: Tên người tạo
+ *           description: Name of the creator
  *         ingredient_count:
  *           type: integer
  *           example: 2
- *           description: Số lượng nguyên liệu
+ *           description: Number of ingredients
  *         ingredients:
  *           type: array
- *           description: Danh sách nguyên liệu chi tiết
+ *           description: Detailed ingredient list
  *           items:
  *             type: object
  *             properties:
@@ -1107,39 +1107,40 @@ module.exports = router;
  *               quantity:
  *                 type: string
  *                 example: "10.000"
- *                 description: Số lượng
+ *                 description: Quantity
  *               quantity_unit:
  *                 type: string
  *                 example: "G"
- *                 description: Đơn vị
+ *                 description: Unit of quantity
  *               quantity_base:
  *                 type: string
  *                 example: "10.000"
- *                 description: Số lượng base (tương đương với quantity)
+ *                 description: Base quantity (equivalent to quantity)
  *               notes:
  *                 type: string
  *                 example: "Đường tinh luyện"
- *                 description: Ghi chú
+ *                 description: Notes
  *               created_at:
  *                 type: string
  *                 format: date-time
  *                 example: "2026-03-02T11:53:46.000Z"
+ *                 description: Creation date
  *               material_name:
  *                 type: string
  *                 example: "Bột mì"
- *                 description: Tên vật liệu
+ *                 description: Material name
  *               material_sku:
  *                 type: string
  *                 example: "MAT-BOT-MI"
- *                 description: SKU vật liệu
+ *                 description: Material SKU
  *               material_unit:
  *                 type: string
  *                 example: "kg"
- *                 description: Đơn vị vật liệu gốc
+ *                 description: Material unit
  * 
  *     ErrorResponse:
  *       type: object
- *       description: Response lỗi chuẩn
+ *       description: Standard error response
  *       properties:
  *         success:
  *           type: boolean
