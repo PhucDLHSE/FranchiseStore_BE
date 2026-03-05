@@ -7,7 +7,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
 
 /**
  * @swagger
- * /api/material-inventory:
+ * /material-inventory:
  *   get:
  *     summary: Get all material inventory with batches
  *     tags:
