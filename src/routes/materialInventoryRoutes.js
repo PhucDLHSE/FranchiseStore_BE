@@ -9,7 +9,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  * @swagger
  * tags:
  *   name: Material Inventory
- *   description: Quản lý tồn kho nguyên liệu (READ-ONLY)
+ *   description: Kho nguyên liệu (Central Kitchen Inventory)
  */
 
 /**

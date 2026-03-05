@@ -7,8 +7,8 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
 /**
  * @swagger
  * tags:
- *   name: Material Batches
- *   description: Material Batch Management (Nhập kho nguyên liệu)
+ *   name: Material Batche
+ *   description: Material Batch Management (Nhập kho nguyên liệu theo lô)
  */
 
 /**
@@ -99,7 +99,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
 router.post(
   "/material-batches",
   verifyToken,
-  requireRoles(["MANAGER", "ADMIN"]),  // 🆕 MANAGER only 
+  requireRoles(["MANAGER"]),  
   materialBatchController.create
 );
 

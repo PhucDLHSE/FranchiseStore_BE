@@ -8,7 +8,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  * @swagger
  * tags:
  *   name: Goods Receipt Material
- *   description: Nhập kho nguyên liệu (GoodsReceiptMaterial)
+ *   description: Phiếu nhập kho cho nguyên liệu (Goods Receipt Material) - From Suppelier to Central Kitchen
  */
 
 /**

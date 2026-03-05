@@ -8,7 +8,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  * @swagger
  * tags:
  *   name: Inventory
- *   description: Inventory for Stores
+ *   description: Kho sản phẩm (Inventory Products)
  *
  * components:
  *   schemas:
