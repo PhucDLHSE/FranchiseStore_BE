@@ -26,7 +26,7 @@ router.get(
 
 /**
  * @swagger
- * /api/material-inventory/material/{material_id}:
+ * /material-inventory/material/{material_id}:
  *   get:
  *     summary: Get specific material with all batches
  *     tags:
@@ -48,7 +48,7 @@ router.get(
 
 /**
  * @swagger
- * /api/material-inventory/store/{store_id}:
+ * /material-inventory/store/{store_id}:
  *   get:
  *     summary: Get all materials in a store with batches
  *     tags:
@@ -64,7 +64,7 @@ router.get(
 
 /**
  * @swagger
- * /api/material-inventory/low-stock:
+ * /material-inventory/low-stock:
  *   get:
  *     summary: Get low stock alerts
  *     tags:
@@ -80,7 +80,7 @@ router.get(
 
 /**
  * @swagger
- * /api/material-inventory/empty-stock:
+ * /material-inventory/empty-stock:
  *   get:
  *     summary: Get empty stock alerts
  *     tags:
@@ -96,7 +96,7 @@ router.get(
 
 /**
  * @swagger
- * /api/material-batches:
+ * /material-batches:
  *   post:
  *     summary: Create new material batch
  *     tags:
@@ -122,7 +122,7 @@ router.post(
 
 /**
  * @swagger
- * /api/material-batches/{id}:
+ * /material-batches/{id}:
  *   get:
  *     summary: Get batch by ID
  *     tags:
@@ -138,7 +138,7 @@ router.get(
 
 /**
  * @swagger
- * /api/material-batches:
+ * /material-batches:
  *   get:
  *     summary: Get all material batches
  *     tags:
@@ -154,7 +154,7 @@ router.get(
 
 /**
  * @swagger
- * /api/material-batches/{id}:
+ * /material-batches/{id}:
  *   put:
  *     summary: Update material batch
  *     tags:
@@ -169,7 +169,7 @@ router.put(
 
 /**
  * @swagger
- * /api/material-batches/{id}:
+ * /material-batches/{id}:
  *   delete:
  *     summary: Delete material batch
  *     tags:

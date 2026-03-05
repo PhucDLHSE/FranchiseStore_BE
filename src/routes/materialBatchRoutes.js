@@ -7,7 +7,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
 /**
  * @swagger
  * tags:
- *   name: Material Batche
+ *   name: Material Batches
  *   description: Material Batch Management (Nhập kho nguyên liệu theo lô)
  */
 

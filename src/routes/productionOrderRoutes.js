@@ -8,14 +8,14 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  * @swagger
  * tags:
  *   name: Production Orders
- *   description: API quản lý lệnh sản xuất từ Recipe
+ *   description: Manage Production Orders base on Recipes (Tạo lệnh sản xuất từ công thức)
  */
 
 // ==================== CREATE PRODUCTION ORDER ====================
 
 /**
  * @swagger
- * /api/production-orders:
+ * /production-orders:
  *   post:
  *     summary: Tạo lệnh sản xuất từ Recipe
  *     description: |
@@ -105,7 +105,7 @@ router.post(
 
 /**
  * @swagger
- * /api/production-orders:
+ * /production-orders:
  *   get:
  *     summary: Lấy danh sách lệnh sản xuất
  *     description: Lấy danh sách tất cả lệnh sản xuất với filter và tìm kiếm
@@ -150,7 +150,7 @@ router.get(
 
 /**
  * @swagger
- * /api/production-orders/{id}:
+ * /production-orders/{id}:
  *   get:
  *     summary: Lấy chi tiết lệnh sản xuất (+ Auto re-allocate nếu PENDING)
  *     description: |
@@ -217,7 +217,7 @@ router.get(
 
 /**
  * @swagger
- * /api/production-orders/{id}:
+ * /production-orders/{id}:
  *   patch:
  *     summary: Cập nhật lệnh sản xuất (chỉ PENDING)
  *     description: Cập nhật số lượng hoặc ngày sản xuất kế hoạch (chỉ khi status = PENDING)
@@ -259,7 +259,7 @@ router.patch(
 
 /**
  * @swagger
- * /api/production-orders/{id}/start:
+ * /production-orders/{id}/start:
  *   patch:
  *     summary: Bắt đầu sản xuất
  *     description: Chuyển status từ CONFIRMED → IN_PROGRESS (chỉ CONFIRMED mới được bắt đầu)
@@ -288,7 +288,7 @@ router.patch(
 
 /**
  * @swagger
- * /api/production-orders/{id}/complete:
+ * /production-orders/{id}/complete:
  *   patch:
  *     summary: Hoàn thành sản xuất + Nhập vào Inventory
  *     description: |
@@ -336,7 +336,7 @@ router.patch(
 
 /**
  * @swagger
- * /api/production-orders/{id}/cancel:
+ * /production-orders/{id}/cancel:
  *   patch:
  *     summary: Hủy lệnh sản xuất
  *     description: |
@@ -370,7 +370,7 @@ router.patch(
 
 /**
  * @swagger
- * /api/production-orders/{id}:
+ * /production-orders/{id}:
  *   delete:
  *     summary: Xóa lệnh sản xuất
  *     description: Soft delete (chỉ PENDING/CONFIRMED được xóa)

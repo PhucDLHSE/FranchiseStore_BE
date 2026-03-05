@@ -15,7 +15,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
 
 /**
  * @swagger
- * /api/product-recipes:
+ * /product-recipes:
  *   post:
  *     summary: Create a new product recipe + Auto-create Product
  *     description: |
@@ -175,7 +175,7 @@ router.post(
 
 /**
  * @swagger
- * /api/product-recipes:
+ * /product-recipes:
  *   get:
  *     summary: Get all product recipes
  *     description: |
@@ -246,7 +246,7 @@ router.get(
 
 /**
  * @swagger
- * /api/product-recipes/active:
+ * /product-recipes/active:
  *   get:
  *     summary: Get active product recipes
  *     description: |
@@ -285,7 +285,7 @@ router.get(
 
 /**
  * @swagger
- * /api/product-recipes/category/{category_id}:
+ * /product-recipes/category/{category_id}:
  *   get:
  *     summary: Get product recipes by category
  *     description: |
@@ -332,7 +332,7 @@ router.get(
 
 /**
  * @swagger
- * /api/product-recipes/{id}:
+ * /product-recipes/{id}:
  *   get:
  *     summary: Get product recipe details  
  *     description: |
@@ -385,7 +385,7 @@ router.get(
 
 /**
  * @swagger
- * /api/product-recipes/{id}:
+ * /product-recipes/{id}:
  *   patch:
  *     summary: Update product recipe and ingredients
  *     description: |
@@ -544,7 +544,7 @@ router.patch(
 
 /**
  * @swagger
- * /api/product-recipes/{id}:
+ * /product-recipes/{id}:
  *   delete:
  *     summary: Soft delete product recipe
  *     description: |
@@ -619,7 +619,7 @@ router.delete(
 
 /**
  * @swagger
- * /api/product-recipes/{id}/restore:
+ * /product-recipes/{id}/restore:
  *   patch:
  *     summary: Restore deleted product recipe
  *     description: |
@@ -687,7 +687,7 @@ router.patch(
 
 /**
  * @swagger
- * /api/product-recipes/{id}/ingredients:
+ * /product-recipes/{id}/ingredients:
  *   post:
  *     summary: Add ingredient to product recipe
  *     description: |
@@ -814,7 +814,7 @@ router.post(
 
 /**
  * @swagger
- * /api/product-recipes/{recipe_id}/ingredients/{ingredient_id}:
+ * /product-recipes/{recipe_id}/ingredients/{ingredient_id}:
  *   patch:
  *     summary: Update an ingredient in a product recipe
  *     description: |
@@ -923,7 +923,7 @@ router.patch(
 
 /**
  * @swagger
- * /api/product-recipes/{recipe_id}/ingredients/{ingredient_id}:
+ * /product-recipes/{recipe_id}/ingredients/{ingredient_id}:
  *   delete:
  *     summary: Delete an ingredient from a product recipe
  *     description: |
