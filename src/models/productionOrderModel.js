@@ -1,5 +1,6 @@
 const pool = require("../configs/database");
 const unitConverter = require("../utils/unitConverter");
+const materialInventoryModel = require("./materialInventoryModel");
 
 // ==================== CREATE ====================
 
@@ -80,12 +81,12 @@ exports.createWithMaterialAllocation = async (data, userId) => {
     console.log(`[ProductionOrder Create] ✅ Order created: ID=${orderId}, Code=${orderCode}`);
 
     // ==================== STEP 4: CALCULATE & ALLOCATE MATERIALS ====================
+    const unitConverter = require("../utils/unitConverter");
     const allocationResults = [];
     let isAllocationSuccessful = true;
 
     for (const ingredient of ingredients) {
-      // Calculate required quantity based on target_quantity
-      // Formula: required = ingredient.quantity * (target_quantity / recipe.yield_quantity)
+      // Calculate required quantity
       const requiredQuantity = Number(
         ((ingredient.quantity * target_quantity) / recipe.yield_quantity).toFixed(3)
       );
@@ -95,114 +96,108 @@ exports.createWithMaterialAllocation = async (data, userId) => {
         `[ProductionOrder Create] Material ${ingredient.material_id}: required = ${requiredQuantity} ${requiredUnit}`
       );
 
-      // Check MaterialInventory
-      const [stock] = await connection.query(
-        `SELECT id, quantity, unit FROM MaterialInventory
-         WHERE material_id = ? AND store_id = ?`,
+      // ==================== ✅ FIFO APPROACH ====================
+      // Get all batches in FIFO order
+      const [batches] = await connection.query(
+        `SELECT mib.id, mib.batch_id, mib.quantity, mib.unit, mib.sequence,
+                mb.batch_code, mb.supplier_name
+         FROM MaterialInventoryBatch mib
+         JOIN MaterialBatch mb ON mib.batch_id = mb.id
+         WHERE mib.material_id = ? AND mib.store_id = ? AND mib.quantity > 0
+         ORDER BY mib.sequence ASC`,
         [ingredient.material_id, store_id]
       );
 
-      let availableQuantity = 0;
-      let stockUnit = null;
-
-      if (stock.length > 0) {
-        availableQuantity = Number(stock[0].quantity);
-        stockUnit = stock[0].unit.toUpperCase();
-      }
-
-      // ==================== ✅ FIX: UNIT CONVERSION & COMPARISON ====================
       let allocation_status = "PENDING";
       let allocated_quantity = 0;
-      let comparison_result = null;
+      let batches_used = [];
+      let totalAvailable = 0;
 
-      try {
-        // Check if units are compatible
-        if (availableQuantity > 0 && stockUnit) {
-          if (!unitConverter.isCompatibleUnit(stockUnit, requiredUnit)) {
-            throw new Error(
-              `Unit mismatch: Stock unit ${stockUnit} not compatible with required unit ${requiredUnit}`
+      if (batches.length > 0) {
+        // Check total available across all batches
+        let remainingToAllocate = requiredQuantity;
+        let batchesForAllocation = [];
+
+        for (const batch of batches) {
+          if (remainingToAllocate <= 0) break;
+
+          const batchQuantity = Number(batch.quantity);
+          const batchUnit = batch.unit.toUpperCase();
+
+          try {
+            // Check unit compatibility
+            if (!unitConverter.isCompatibleUnit(batchUnit, requiredUnit)) {
+              throw new Error(
+                `Unit mismatch: ${batchUnit} not compatible with ${requiredUnit}`
+              );
+            }
+
+            // Convert batch qty to required unit
+            const batchQtyInRequiredUnit = unitConverter.convertUnit(
+              batchQuantity,
+              batchUnit,
+              requiredUnit
             );
-          }
 
-          // Convert available stock to required unit for comparison
-          const convertedAvailable = unitConverter.convertUnit(
-            availableQuantity,
-            stockUnit,
-            requiredUnit
-          );
+            totalAvailable += batchQtyInRequiredUnit;
+            const takeFromThisBatch = Math.min(remainingToAllocate, batchQtyInRequiredUnit);
+
+            batchesForAllocation.push({
+              mib_id: batch.id,
+              batch_id: batch.batch_id,
+              batch_code: batch.batch_code,
+              supplier_name: batch.supplier_name,
+              sequence: batch.sequence,
+              take_quantity: takeFromThisBatch,
+              take_unit: requiredUnit,
+              batch_unit: batchUnit
+            });
+
+            remainingToAllocate -= takeFromThisBatch;
+          } catch (err) {
+            console.error(`[ProductionOrder Create] Error: ${err.message}`);
+            throw err;
+          }
+        }
+
+        // ✅ If we have enough across all batches, allocate
+        if (remainingToAllocate <= 0.001) { // Allow small float error
+          allocation_status = "ALLOCATED";
+          allocated_quantity = requiredQuantity;
+          batches_used = batchesForAllocation;
 
           console.log(
-            `[ProductionOrder Create] ✅ Unit conversion: ${availableQuantity} ${stockUnit} = ${convertedAvailable.toFixed(3)} ${requiredUnit}`
+            `[ProductionOrder Create] ✅ ALLOCATED from ${batchesForAllocation.length} batches`
           );
 
-          // Compare converted quantity with required
-          if (convertedAvailable >= requiredQuantity) {
-            // ✅ SUFFICIENT - ALLOCATE
-            allocation_status = "ALLOCATED";
-            allocated_quantity = requiredQuantity;
-
-            // ✅ Convert required quantity back to stock unit for deduction
-            const deductQuantity = unitConverter.convertUnit(
-              requiredQuantity,
-              requiredUnit,
-              stockUnit
+          // ✅ Deduct from batches using FIFO
+          for (const batchAlloc of batchesForAllocation) {
+            const deductInBatchUnit = unitConverter.convertUnit(
+              batchAlloc.take_quantity,
+              batchAlloc.take_unit,
+              batchAlloc.batch_unit
             );
 
-            console.log(
-              `[ProductionOrder Create] ✅ Allocated ${requiredQuantity} ${requiredUnit} (deduct ${deductQuantity.toFixed(3)} ${stockUnit} from inventory)`
-            );
-
-            // UPDATE MaterialInventory with converted quantity
             await connection.query(
-              `UPDATE MaterialInventory 
+              `UPDATE MaterialInventoryBatch
                SET quantity = quantity - ?, updated_at = NOW()
-               WHERE material_id = ? AND store_id = ?`,
-              [deductQuantity, ingredient.material_id, store_id]
+               WHERE id = ?`,
+              [deductInBatchUnit, batchAlloc.mib_id]
             );
-
-            comparison_result = {
-              available: convertedAvailable,
-              required: requiredQuantity,
-              enough: true
-            };
-          } else {
-            // ❌ INSUFFICIENT
-            allocation_status = "PENDING";
-            isAllocationSuccessful = false;
-
-            const shortage = requiredQuantity - convertedAvailable;
-            console.log(
-              `[ProductionOrder Create] ⚠️ INSUFFICIENT: need=${requiredQuantity} ${requiredUnit}, available=${convertedAvailable.toFixed(3)} ${requiredUnit}, shortage=${shortage.toFixed(3)} ${requiredUnit}`
-            );
-
-            comparison_result = {
-              available: convertedAvailable,
-              required: requiredQuantity,
-              shortage: shortage,
-              enough: false
-            };
           }
         } else {
-          // No stock
           allocation_status = "PENDING";
           isAllocationSuccessful = false;
 
           console.log(
-            `[ProductionOrder Create] ⚠️ NO STOCK: available=${availableQuantity} ${stockUnit}, need=${requiredQuantity} ${requiredUnit}`
+            `[ProductionOrder Create] ⚠️ INSUFFICIENT: need=${requiredQuantity} ${requiredUnit}, available=${totalAvailable.toFixed(3)} ${requiredUnit}`
           );
-
-          comparison_result = {
-            available: 0,
-            available_unit: stockUnit,
-            required: requiredQuantity,
-            required_unit: requiredUnit,
-            enough: false
-          };
         }
-      } catch (error) {
-        console.error(`[ProductionOrder Create] ❌ Error processing material: ${error.message}`);
+      } else {
         allocation_status = "PENDING";
         isAllocationSuccessful = false;
+
+        console.log(`[ProductionOrder Create] ⚠️ NO STOCK for material ${ingredient.material_id}`);
       }
 
       // Insert ProductionOrderMaterial
@@ -227,14 +222,33 @@ exports.createWithMaterialAllocation = async (data, userId) => {
         required_unit: requiredUnit,
         allocated_quantity: allocated_quantity,
         allocated_unit: requiredUnit,
-        available_quantity: availableQuantity,
-        available_unit: stockUnit,
+        available_quantity: totalAvailable,
+        available_unit: requiredUnit,
         status: allocation_status,
-        comparison: comparison_result
+        batches_used: batches_used
       });
     }
 
-    // ==================== STEP 5: UPDATE ORDER STATUS ====================
+    // ==================== STEP 5: UPDATE MaterialInventory AGGREGATE ====================
+    // Recalculate totals for all materials that were used
+    for (const alloc of allocationResults) {
+      if (alloc.status === "ALLOCATED") {
+        const [totals] = await connection.query(
+          `SELECT COALESCE(SUM(quantity), 0) as total FROM MaterialInventoryBatch
+           WHERE material_id = ? AND store_id = ?`,
+          [alloc.material_id, store_id]
+        );
+
+        await connection.query(
+          `UPDATE MaterialInventory
+           SET quantity = ?, updated_at = NOW()
+           WHERE material_id = ? AND store_id = ?`,
+          [totals[0]?.total || 0, alloc.material_id, store_id]
+        );
+      }
+    }
+
+    // ==================== STEP 6: UPDATE ORDER STATUS ====================
     let orderStatus = "PENDING";
     if (isAllocationSuccessful) {
       orderStatus = "CONFIRMED";

@@ -34,9 +34,8 @@ const generateReceiptCode = () => {
 };
 
 /**
- * Create MaterialBatch (MANAGER only)
- * Return Batch AND goods receipt info
- * POST /material-batches
+ * ✅ Create MaterialBatch + AUTO-CREATE GoodsReceiptMaterial
+ * POST /api/material-batches
  */
 exports.create = async (req, res) => {
   try {
@@ -44,28 +43,25 @@ exports.create = async (req, res) => {
       material_id, 
       store_id,
       quantity, 
-      unit, 
       supplier_name, 
       received_date, 
-      notes 
+      notes,
+      status = "PENDING"
     } = req.body;
+
     const user = req.user;
 
-    // Validation: store_id required
-    if (!store_id) {
-      return response.error(
-        res,
-        ERROR.BAD_REQUEST,
-        "store_id is required (MANAGER must specify target store)"
-      );
-    }
+    console.log(
+      `[MaterialBatch Create] ${user.role} ${user.id} creating batch for material ${material_id} ` +
+      `quantity=${quantity} status=${status} store_id=${store_id}`
+    );
 
-    // Validation: material_id & quantity required
-    if (!material_id || !quantity) {
+    // ==================== VALIDATION ====================
+    if (!store_id || !material_id || !quantity) {
       return response.error(
         res,
         ERROR.BAD_REQUEST,
-        "material_id and quantity are required"
+        "Missing required fields: material_id, store_id, quantity"
       );
     }
 
@@ -87,24 +83,15 @@ exports.create = async (req, res) => {
       );
     }
 
-    // Check unit matches material unit
-    if (unit && unit !== material.unit) {
-      return response.error(
-        res,
-        { code: 400, message: "Unit mismatch" },
-        `Unit must be "${material.unit}". Provided: "${unit}"`
-      );
-    }
+    console.log(`[MaterialBatch Create] ✅ Material found: ${material.name}`);
 
-    console.log(
-      `[MaterialBatch Create] MANAGER ${user.id} creating batch for material ${material.name} ` +
-      `quantity=${quantity} ${material.unit} store_id=${store_id}`
-    );
-
-    // Generate batch code
+    // ==================== GENERATE UNIQUE BATCH CODE ====================
     let batch_code = generateBatchCode();
     let attempts = 0;
-    while (await materialBatchModel.batchCodeExists(batch_code) && attempts < 10) {
+    
+    while (attempts < 10) {
+      const exists = await materialBatchModel.batchCodeExists(batch_code);
+      if (!exists) break;
       batch_code = generateBatchCode();
       attempts++;
     }
@@ -117,80 +104,86 @@ exports.create = async (req, res) => {
       );
     }
 
-    // Create MaterialBatch with status PENDING
-    const batchId = await materialBatchModel.create({
-      batch_code,
-      material_id,
-      store_id,
-      quantity,
-      unit: material.unit,
-      supplier_name: supplier_name || null,
-      received_date: received_date || new Date().toISOString().slice(0, 10),
-      created_by: user.id,
-      notes: notes || null,
-      status: 'PENDING'
-    });
+    console.log(`[MaterialBatch Create] Generated batch code: ${batch_code}`);
 
-    console.log(`[MaterialBatch Create] ✅ Batch ${batchId} created with code: ${batch_code}`);
+    // ==================== CREATE MATERIAL BATCH ====================
+    const batchId = await materialBatchModel.create(
+      {
+        batch_code,
+        material_id,
+        store_id,
+        quantity,
+        supplier_name: supplier_name || null,
+        received_date: received_date || new Date().toISOString().slice(0, 10),
+        notes: notes || null,
+        status: status || "PENDING"
+      },
+      user.id
+    );
 
-    // 🆕 Initialize goods receipt data
+    console.log(`[MaterialBatch Create] ✅ Batch ${batchId} created with code ${batch_code}`);
+
+    // ==================== AUTO-CREATE GOODS RECEIPT ====================
     let goods_receipt_id = null;
     let receipt_code = null;
 
-    // AUTO-CREATE GoodsReceiptMaterial with status PENDING
     try {
-      console.log(
-        `[MaterialBatch Create] AUTO-creating GoodsReceiptMaterial for batch ${batchId}`
-      );
-
       receipt_code = generateReceiptCode();
       let receipt_attempts = 0;
-      while (await goodsReceiptMaterialModel.receiptCodeExists(receipt_code) && receipt_attempts < 10) {
+
+      // Generate unique receipt code
+      while (receipt_attempts < 10) {
+        const exists = await goodsReceiptMaterialModel.receiptCodeExists(receipt_code);
+        if (!exists) break;
         receipt_code = generateReceiptCode();
         receipt_attempts++;
       }
 
       if (receipt_attempts >= 10) {
-        console.warn("[MaterialBatch Create] ⚠️ Failed to generate unique receipt code");
+        console.warn("[MaterialBatch Create] ⚠️ Failed to generate unique receipt code, skipping goods receipt");
       } else {
+        // ✅ Create Goods Receipt with status = PENDING
         goods_receipt_id = await goodsReceiptMaterialModel.create({
           receipt_code,
           material_batch_id: batchId,
           received_quantity: quantity,
           unit: material.unit,
           created_by: user.id,
-          notes: null
+          notes: notes || null,
+          status: "PENDING"  // ✅ Status = PENDING
         });
 
         console.log(
-          `[MaterialBatch Create] ✅ GoodsReceiptMaterial ${goods_receipt_id} created with code: ${receipt_code} ` +
-          `(status: PENDING, waiting for CK_STAFF to confirm)`
+          `[MaterialBatch Create] ✅ GoodsReceiptMaterial ${goods_receipt_id} auto-created: ${receipt_code}`
         );
       }
     } catch (receiptErr) {
-      console.error("[MaterialBatch Create] Error creating GoodsReceiptMaterial:", receiptErr);
-      console.warn(`[MaterialBatch Create] ⚠️ GoodsReceiptMaterial not created, but batch created`);
+      console.error("[MaterialBatch Create] Error creating GoodsReceiptMaterial:", receiptErr.message);
+      console.warn(`[MaterialBatch Create] ⚠️ Batch created but GoodsReceiptMaterial failed`);
     }
 
+    // ==================== GET CREATED BATCH ====================
     const batch = await materialBatchModel.getById(batchId);
-    
-    // 🆕 Enhance response with goods receipt info
-    const responseData = {
-      ...batch,
-      goods_receipt_id,
-      receipt_code
-    };
+    if (!batch) {
+      return response.error(
+        res,
+        ERROR.INTERNAL_ERROR,
+        "Failed to retrieve created batch"
+      );
+    }
 
-    console.log(`[MaterialBatch Create] ✅ MaterialBatch ${batchId} created successfully`);
+    console.log(`[MaterialBatch Create] ✅ Successfully created batch with goods_receipt_id=${goods_receipt_id}`);
+    
     return response.success(
       res, 
-      responseData, 
-      "Material batch and goods receipt created. Waiting for CK_STAFF to receive."
+      batch, 
+      `Material batch created with status ${batch.status}. Goods Receipt ID: ${goods_receipt_id}`,
+      201
     );
 
   } catch (err) {
-    console.error("[MaterialBatch Create] Error:", err);
-    return response.error(res, ERROR.INTERNAL_ERROR);
+    console.error("[MaterialBatch Create] Error:", err.message);
+    return response.error(res, ERROR.INTERNAL_ERROR, err.message);
   }
 };
 
