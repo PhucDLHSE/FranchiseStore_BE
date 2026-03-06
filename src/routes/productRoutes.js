@@ -44,51 +44,51 @@ router.get("/products", productController.getAll);
  */
 router.get("/products/:id", productController.getById);
 
-/**
- * @swagger
- * /products:
- *   post:
- *     summary: Create product (MANAGER)
- *     tags: [Product]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - category_id
- *               - name
- *               - uom
- *               - product_type
- *             properties:
- *               category_id:
- *                 type: integer
- *                 example: 4
- *               name:
- *                 type: string
- *                 example: Bột mì số 8
- *               image_url:
- *                 type: string
- *                 nullable: true
- *                 example: https://cdn.example.com/products/bot-mi.jpg
- *               uom:
- *                 type: string
- *                 enum: [PC, KG, G, L, ML, PACK, BOX]
- *                 example: KG
- *               product_type:
- *                 type: string
- *                 enum: [RAW_MATERIAL, FINISHED]
- *                 example: RAW_MATERIAL
- *     responses:
- *       201:
- *         description: Product created successfully
- *       400:
- *         description: Validation error
- */
-router.post("/products", verifyToken, requireManager, productController.create);
+// /**
+//  * @swagger
+//  * /products:
+//  *   post:
+//  *     summary: Create product (MANAGER)
+//  *     tags: [Product]
+//  *     security:
+//  *       - bearerAuth: []
+//  *     requestBody:
+//  *       required: true
+//  *       content:
+//  *         application/json:
+//  *           schema:
+//  *             type: object
+//  *             required:
+//  *               - category_id
+//  *               - name
+//  *               - uom
+//  *               - product_type
+//  *             properties:
+//  *               category_id:
+//  *                 type: integer
+//  *                 example: 4
+//  *               name:
+//  *                 type: string
+//  *                 example: Bột mì số 8
+//  *               image_url:
+//  *                 type: string
+//  *                 nullable: true
+//  *                 example: https://cdn.example.com/products/bot-mi.jpg
+//  *               uom:
+//  *                 type: string
+//  *                 enum: [PC, KG, G, L, ML, PACK, BOX]
+//  *                 example: KG
+//  *               product_type:
+//  *                 type: string
+//  *                 enum: [RAW_MATERIAL, FINISHED]
+//  *                 example: RAW_MATERIAL
+//  *     responses:
+//  *       201:
+//  *         description: Product created successfully
+//  *       400:
+//  *         description: Validation error
+//  */
+// router.post("/products", verifyToken, requireManager, productController.create);
 
 /**
  * @swagger
