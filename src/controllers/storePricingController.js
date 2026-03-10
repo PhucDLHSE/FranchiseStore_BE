@@ -240,4 +240,128 @@ exports.getPricingHistory = async (req, res) => {
   }
 };
 
+/**
+ * ✅ Get all products with sale price (for shop display)
+ * GET /api/store-pricing/products/available
+ */
+exports.getProductsForSale = async (req, res) => {
+  try {
+    const { keyword, category_id, low_stock } = req.query;
+    const user = req.user;
+    const storeId = user.store_id;
+
+    console.log(
+      `[StorePricing GetProducts] Store ${storeId} fetching products with sale price`
+    );
+
+    const products = await storePricingModel.getStoreProductsWithPricing(
+      storeId,
+      { keyword, category_id, low_stock }
+    );
+
+    console.log(
+      `[StorePricing GetProducts] ✅ Found ${products.length} products available for sale`
+    );
+
+    const result = products.map(p => ({
+      id: p.id,
+      name: p.name,
+      sku: p.sku,
+      image_url: p.image_url,
+      uom: p.uom,
+      category_id: p.category_id,
+      category_name: p.category_name,
+      cost_price: parseFloat(p.unit_price),
+      sale_price: parseFloat(p.sale_price),
+      profit_per_unit: parseFloat(p.profit_per_unit),
+      profit_margin_percent: parseFloat(p.profit_margin_percent),
+      stock_quantity: p.stock_quantity || 0,
+      available_quantity: p.available_quantity || 0,
+      reserved_quantity: p.reserved_quantity || 0,
+      price_effective_date: p.price_effective_date
+    }));
+
+    return response.success(
+      res,
+      result,
+      `Found ${result.length} products with sale prices`
+    );
+
+  } catch (error) {
+    console.error("[StorePricing GetProducts] Error:", error);
+    return response.error(res, ERROR.INTERNAL_ERROR, error.message);
+  }
+};
+
+/**
+ * ✅ Get products without pricing yet
+ * GET /api/store-pricing/products/without-pricing
+ */
+exports.getProductsWithoutPricing = async (req, res) => {
+  try {
+    const { keyword, category_id } = req.query;
+    const user = req.user;
+    const storeId = user.store_id;
+
+    console.log(
+      `[StorePricing GetProductsWithoutPricing] Store ${storeId} fetching products without pricing`
+    );
+
+    const products = await storePricingModel.getProductsWithoutPricing(
+      storeId,
+      { keyword, category_id }
+    );
+
+    console.log(
+      `[StorePricing GetProductsWithoutPricing] ✅ Found ${products.length} products without pricing`
+    );
+
+    const result = products.map(p => ({
+      id: p.id,
+      name: p.name,
+      sku: p.sku,
+      image_url: p.image_url,
+      uom: p.uom,
+      category_id: p.category_id,
+      category_name: p.category_name,
+      cost_price: parseFloat(p.unit_price),
+      stock_quantity: p.stock_quantity || 0,
+      status: 'PRICING_NEEDED'
+    }));
+
+    return response.success(
+      res,
+      result,
+      `Found ${result.length} products without sale prices`
+    );
+
+  } catch (error) {
+    console.error("[StorePricing GetProductsWithoutPricing] Error:", error);
+    return response.error(res, ERROR.INTERNAL_ERROR, error.message);
+  }
+};
+
+/**
+ * ✅ Get pricing statistics
+ * GET /api/store-pricing/statistics
+ */
+exports.getStatistics = async (req, res) => {
+  try {
+    const user = req.user;
+    const storeId = user.store_id;
+
+    console.log(
+      `[StorePricing Statistics] Store ${storeId} fetching statistics`
+    );
+
+    const stats = await storePricingModel.getPricingStatistics(storeId);
+
+    return response.success(res, stats, "Pricing statistics retrieved");
+
+  } catch (error) {
+    console.error("[StorePricing Statistics] Error:", error);
+    return response.error(res, ERROR.INTERNAL_ERROR, error.message);
+  }
+};
+
 module.exports = exports;

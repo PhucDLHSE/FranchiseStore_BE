@@ -125,4 +125,104 @@ router.get(
   storePricingController.getPricingHistory
 );
 
+/**
+ * @swagger
+ * /api/store-pricing/products/available:
+ *   get:
+ *     summary: Get all products with sale price (for shop)
+ *     tags: [StorePricing]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: keyword
+ *         schema:
+ *           type: string
+ *         description: Search by product name or SKU
+ *       - in: query
+ *         name: category_id
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: low_stock
+ *         schema:
+ *           type: boolean
+ *     responses:
+ *       200:
+ *         description: List of products available for sale
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: integer
+ *                   name:
+ *                     type: string
+ *                   sku:
+ *                     type: string
+ *                   cost_price:
+ *                     type: number
+ *                   sale_price:
+ *                     type: number
+ *                   profit_per_unit:
+ *                     type: number
+ *                   profit_margin_percent:
+ *                     type: number
+ *                   available_quantity:
+ *                     type: integer
+ */
+router.get(
+  "/store-pricing/products/available",
+  verifyToken,
+  storePricingController.getProductsForSale
+);
+
+/**
+ * @swagger
+ * /api/store-pricing/products/without-pricing:
+ *   get:
+ *     summary: Get products without sale price set
+ *     tags: [StorePricing]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: keyword
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: category_id
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: List of products without pricing
+ */
+router.get(
+  "/store-pricing/products/without-pricing",
+  verifyToken,
+  storePricingController.getProductsWithoutPricing
+);
+
+/**
+ * @swagger
+ * /api/store-pricing/statistics:
+ *   get:
+ *     summary: Get pricing statistics for store
+ *     tags: [StorePricing]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Pricing statistics
+ */
+router.get(
+  "/store-pricing/statistics",
+  verifyToken,
+  storePricingController.getStatistics
+);
+
 module.exports = router;

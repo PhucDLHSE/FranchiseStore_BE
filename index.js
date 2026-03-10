@@ -32,6 +32,7 @@ const goodsIssueRoutes = require("./src/routes/goodsIssueRoutes");
 const goodsReceiptRoutes = require("./src/routes/goodsReceiptRoutes.js");
 const goodsReceiptMaterialRoutes = require("./src/routes/goodsReceiptMaterialRoutes");
 const storePricingRoutes = require("./src/routes/storePricingRoutes");
+const salesOrderRoutes = require("./src/routes/salesOrderRoutes");
 const startAutoCancelJob = require("./src/services/autoCancelJob");
 
 
@@ -54,6 +55,7 @@ app.use("/api", goodsIssueRoutes);
 app.use("/api", goodsReceiptRoutes);
 app.use("/api", goodsReceiptMaterialRoutes);
 app.use("/api", storePricingRoutes);
+app.use("/api", salesOrderRoutes);
 
 
 

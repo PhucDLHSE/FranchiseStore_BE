@@ -167,4 +167,137 @@ exports.getProductWithPricing = async (storeId, productId) => {
   return rows.length > 0 ? rows[0] : null;
 };
 
+/**
+ * ✅ Get all products with pricing for store (for display/shop)
+ */
+exports.getStoreProductsWithPricing = async (storeId, filters = {}) => {
+  const { keyword, category_id, low_stock } = filters;
+
+  let query = `
+    SELECT 
+      p.id,
+      p.category_id,
+      c.name AS category_name,
+      p.name,
+      p.sku,
+      p.image_url,
+      p.uom,
+      p.unit_price,
+      p.is_active,
+      COALESCE(sp.sale_price, 0) AS sale_price,
+      COALESCE(sp.effective_date, CURDATE()) AS price_effective_date,
+      i.quantity AS stock_quantity,
+      i.reserved_quantity,
+      (i.quantity - COALESCE(i.reserved_quantity, 0)) AS available_quantity,
+      (sp.sale_price - p.unit_price) AS profit_per_unit,
+      CASE 
+        WHEN sp.sale_price > 0 THEN ROUND(((sp.sale_price - p.unit_price) / p.unit_price * 100), 2)
+        ELSE 0
+      END AS profit_margin_percent
+    FROM Product p
+    LEFT JOIN Category c ON p.category_id = c.id
+    LEFT JOIN StorePricing sp ON p.id = sp.product_id 
+      AND sp.store_id = ?
+      AND sp.effective_date <= CURDATE()
+    LEFT JOIN Inventory i ON p.id = i.product_id AND i.store_id = ?
+    WHERE p.is_active = TRUE
+      AND p.deleted_at IS NULL
+      AND sp.id IS NOT NULL
+  `;
+
+  const params = [storeId, storeId];
+
+  if (keyword) {
+    query += ` AND (p.name LIKE ? OR p.sku LIKE ?)`;
+    const searchTerm = `%${keyword}%`;
+    params.push(searchTerm, searchTerm);
+  }
+
+  if (category_id) {
+    query += ` AND p.category_id = ?`;
+    params.push(category_id);
+  }
+
+  if (low_stock === "true" || low_stock === true) {
+    query += ` AND i.quantity < 10`;
+  }
+
+  query += ` ORDER BY p.name ASC`;
+
+  const [rows] = await pool.query(query, params);
+  return rows;
+};
+
+/**
+ * ✅ Get products without pricing yet (not available for sale)
+ */
+exports.getProductsWithoutPricing = async (storeId, filters = {}) => {
+  const { keyword, category_id } = filters;
+
+  let query = `
+    SELECT 
+      p.id,
+      p.category_id,
+      c.name AS category_name,
+      p.name,
+      p.sku,
+      p.image_url,
+      p.uom,
+      p.unit_price,
+      p.is_active,
+      i.quantity AS stock_quantity
+    FROM Product p
+    LEFT JOIN Category c ON p.category_id = c.id
+    LEFT JOIN Inventory i ON p.id = i.product_id AND i.store_id = ?
+    WHERE p.is_active = TRUE
+      AND p.deleted_at IS NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM StorePricing sp 
+        WHERE sp.product_id = p.id 
+        AND sp.store_id = ?
+        AND sp.effective_date <= CURDATE()
+      )
+  `;
+
+  const params = [storeId, storeId];
+
+  if (keyword) {
+    query += ` AND (p.name LIKE ? OR p.sku LIKE ?)`;
+    const searchTerm = `%${keyword}%`;
+    params.push(searchTerm, searchTerm);
+  }
+
+  if (category_id) {
+    query += ` AND p.category_id = ?`;
+    params.push(category_id);
+  }
+
+  query += ` ORDER BY p.name ASC`;
+
+  const [rows] = await pool.query(query, params);
+  return rows;
+};
+
+/**
+ * ✅ Get pricing statistics for store
+ */
+exports.getPricingStatistics = async (storeId) => {
+  const [rows] = await pool.query(
+    `SELECT 
+      COUNT(DISTINCT sp.product_id) AS products_with_pricing,
+      AVG(sp.sale_price) AS avg_sale_price,
+      MIN(sp.sale_price) AS min_sale_price,
+      MAX(sp.sale_price) AS max_sale_price,
+      SUM(i.quantity) AS total_stock,
+      SUM(i.quantity - COALESCE(i.reserved_quantity, 0)) AS total_available
+     FROM StorePricing sp
+     LEFT JOIN Inventory i ON sp.product_id = i.product_id AND i.store_id = ?
+     WHERE sp.store_id = ?
+     AND sp.effective_date <= CURDATE()`,
+    [storeId, storeId]
+  );
+
+  return rows[0];
+};
+
 module.exports = exports;

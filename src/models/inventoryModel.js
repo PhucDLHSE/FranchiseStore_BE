@@ -176,4 +176,26 @@ exports.getByStoreAndProduct = async (storeId, productId) => {
   );
   return rows.length ? rows[0] : null;
 };
+
+/**
+ * Get inventory by product and store
+ */
+exports.getByProductAndStore = async (productId, storeId) => {
+  const [rows] = await pool.query(
+    `SELECT 
+      id,
+      store_id,
+      product_id,
+      quantity,
+      reserved_quantity,
+      created_at,
+      updated_at
+     FROM Inventory
+     WHERE product_id = ? AND store_id = ?`,
+    [productId, storeId]
+  );
+
+  return rows.length > 0 ? rows[0] : null;
+};
+
   
