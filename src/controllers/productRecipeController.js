@@ -34,6 +34,7 @@ const generateRecipeCode = async () => {
 
 /**
  * Create ProductRecipe + Product (AUTOMATIC)
+ * ✅ UPDATED: Product created + Link product_id to ProductRecipe
  * POST /product-recipes
  */
 exports.create = async (req, res) => {
@@ -148,7 +149,7 @@ exports.create = async (req, res) => {
         material_name: material.name,
         quantity: ingredient.quantity,
         quantity_unit: ingredient.quantity_unit.toUpperCase(),
-        quantity_base: ingredient.quantity,  // ✅ SAME AS QUANTITY (NO CONVERSION)
+        quantity_base: ingredient.quantity,
         notes: ingredient.notes || null
       });
 
@@ -161,23 +162,45 @@ exports.create = async (req, res) => {
     await connection.beginTransaction();
     console.log(`[ProductRecipe Create] 🔄 Transaction started`);
 
-    // ==================== CREATE RECIPE + PRODUCT ====================
-    const { recipe_id, product_id } = await productRecipeModel.createWithProduct(
-      {
-        name,
-        yield_quantity,
-        yield_unit: yield_unit.toUpperCase(),
-        category_id,
-        recipe_code,
-        created_by: user.id
-      },
-      connection
+    // ==================== CREATE RECIPE (WITHOUT product_id first) ====================
+    const [recipeResult] = await connection.query(
+      `INSERT INTO ProductRecipe 
+       (recipe_code, name, yield_quantity, yield_unit, status, created_by)
+       VALUES (?, ?, ?, ?, 'ACTIVE', ?)`,
+      [recipe_code, name, yield_quantity, yield_unit.toUpperCase(), user.id]
     );
 
+    const recipe_id = recipeResult.insertId;
     console.log(
       `[ProductRecipe Create] ✅ Recipe created: ID=${recipe_id}, Code=${recipe_code}`
     );
-    console.log(`[ProductRecipe Create] ✅ Product auto-created: ID=${product_id}`);
+
+    // ==================== AUTO-CREATE PRODUCT (✅ is_active=FALSE, unit_price=NULL) ====================
+    const product_sku = `SKU-${recipe_code}`;
+
+    const [productResult] = await connection.query(
+      `INSERT INTO Product 
+       (category_id, recipe_id, name, sku, uom, is_active, unit_price, sale_price, created_by)
+       VALUES (?, ?, ?, ?, ?, FALSE, NULL, NULL, ?)`,
+      [category_id, recipe_id, name, product_sku, yield_unit.toUpperCase(), user.id]
+    );
+
+    const product_id = productResult.insertId;
+    console.log(
+      `[ProductRecipe Create] ✅ Product auto-created: ID=${product_id} (is_active=FALSE, unit_price=NULL)`
+    );
+
+    // ==================== ✅ LINK product_id BACK TO ProductRecipe ====================
+    await connection.query(
+      `UPDATE ProductRecipe 
+       SET product_id = ?
+       WHERE id = ?`,
+      [product_id, recipe_id]
+    );
+
+    console.log(
+      `[ProductRecipe Create] ✅ ProductRecipe linked with Product: recipe_id=${recipe_id} -> product_id=${product_id}`
+    );
 
     // ==================== ADD INGREDIENTS ====================
     const addedIngredients = [];
@@ -191,7 +214,7 @@ exports.create = async (req, res) => {
           ingredient.material_id,
           ingredient.quantity,
           ingredient.quantity_unit,
-          ingredient.quantity_base,  // ✅ SAME AS QUANTITY
+          ingredient.quantity_base,
           ingredient.notes
         ]
       );
@@ -202,7 +225,7 @@ exports.create = async (req, res) => {
         material_name: ingredient.material_name,
         quantity: ingredient.quantity,
         quantity_unit: ingredient.quantity_unit,
-        quantity_base: ingredient.quantity_base,  // ✅ SAME AS QUANTITY
+        quantity_base: ingredient.quantity_base,
         notes: ingredient.notes
       });
 
@@ -215,7 +238,7 @@ exports.create = async (req, res) => {
     await connection.commit();
     console.log(`[ProductRecipe Create] ✅ Transaction committed`);
 
-    // ==================== GET FULL RECIPE ====================
+    // ==================== GET FULL RECIPE (WITH PRODUCT INFO) ====================
     const recipe = await productRecipeModel.getById(recipe_id);
 
     return response.success(
@@ -224,7 +247,8 @@ exports.create = async (req, res) => {
         recipe,
         product_id
       },
-      `Recipe "${name}" created with ${addedIngredients.length} ingredients + Product auto-created`
+      `Recipe "${name}" created with ${addedIngredients.length} ingredients + Product auto-created (INACTIVE - set unit_price to activate)`,
+      201
     );
 
   } catch (err) {
@@ -235,6 +259,7 @@ exports.create = async (req, res) => {
     connection.release();
   }
 };
+
 
 /**
  * Get all recipes

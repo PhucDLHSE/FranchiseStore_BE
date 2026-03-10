@@ -41,7 +41,7 @@ exports.create = async ({
 
 exports.getById = async (issueId) => {
   const [rows] = await pool.query(
-    `SELECT gi.*, gii.product_id, gii.quantity
+    `SELECT gi.*, gii.product_id, gii.name, gii.quantity
      FROM GoodsIssue gi
      LEFT JOIN GoodsIssueItem gii ON gi.id = gii.goods_issue_id
      WHERE gi.id = ?`,
@@ -65,7 +65,7 @@ exports.getById = async (issueId) => {
   
   rows.forEach(r => {
     if (r.product_id) {  // Tránh thêm items rỗng từ LEFT JOIN
-      base.items.push({ product_id: r.product_id, quantity: r.quantity });
+      base.items.push({ product_id: r.product_id, name: r.name, quantity: r.quantity });
     }
   });
   
@@ -99,7 +99,7 @@ exports.listByStore = async (storeId) => {
  */
 exports.getByOrderId = async (orderId) => {
   const [rows] = await pool.query(
-    `SELECT gi.*, gii.product_id, gii.quantity
+    `SELECT gi.*, gii.product_id, gii.name, gii.quantity
      FROM GoodsIssue gi
      LEFT JOIN GoodsIssueItem gii ON gi.id = gii.goods_issue_id
      WHERE gi.order_id = ? AND gi.status IN ('CREATED', 'COMPLETED')
@@ -127,6 +127,7 @@ exports.getByOrderId = async (orderId) => {
     if (row.product_id) {
       giMap[row.id].items.push({
         product_id: row.product_id,
+        name: row.name,
         quantity: row.quantity
       });
     }

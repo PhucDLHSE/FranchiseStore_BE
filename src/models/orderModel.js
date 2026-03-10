@@ -1,7 +1,8 @@
 const pool = require("../configs/database");
 
 /**
- * Create Order (transaction)
+ * ✅ Create Order with Transaction
+ * items already have unit_price snapshot from Product
  */
 exports.createOrder = async (storeId, userId, deliveryDate, items) => {
   const connection = await pool.getConnection();
@@ -9,10 +10,37 @@ exports.createOrder = async (storeId, userId, deliveryDate, items) => {
   try {
     await connection.beginTransaction();
 
-    // Generate order code
-    const orderCode = "ORD-" + Date.now();
+    // ==================== GENERATE ORDER CODE ====================
+    const generateOrderCode = () => {
+      const now = new Date();
+      const date = now.toISOString().slice(0, 10).replace(/-/g, "");
+      const random = Math.random().toString(36).substr(2, 4).toUpperCase();
+      return `ORD-${date}-${random}`;
+    };
 
-    // 1️⃣ Insert Orders
+    let orderCode = generateOrderCode();
+    let attempts = 0;
+
+    // Ensure unique order code
+    while (attempts < 10) {
+      const [existing] = await connection.query(
+        `SELECT id FROM Orders WHERE order_code = ?`,
+        [orderCode]
+      );
+
+      if (existing.length === 0) break;
+
+      orderCode = generateOrderCode();
+      attempts++;
+    }
+
+    if (attempts >= 10) {
+      throw new Error("Failed to generate unique order code");
+    }
+
+    console.log(`[OrderModel CreateOrder] Generated order code: ${orderCode}`);
+
+    // ==================== INSERT ORDER ====================
     const [orderResult] = await connection.query(
       `INSERT INTO Orders
         (order_code, store_id, delivery_date, status, created_by)
@@ -21,35 +49,45 @@ exports.createOrder = async (storeId, userId, deliveryDate, items) => {
     );
 
     const orderId = orderResult.insertId;
+    console.log(`[OrderModel CreateOrder] ✅ Order inserted: ID=${orderId}`);
 
-    // 2️⃣ Insert OrderItem
+    // ==================== INSERT ORDER ITEMS ====================
+    let totalAmount = 0;
+
     for (const item of items) {
-      await connection.query(
-        `INSERT INTO OrderItem
-          (order_id, product_id, quantity, unit_price)
-         VALUES (?, ?, ?, ?)`,
-        [orderId, item.product_id, item.quantity, item.unit_price]
+      const lineTotal = item.quantity * item.unit_price;
+      totalAmount += lineTotal;
+
+      const [itemResult] = await connection.query(
+      `INSERT INTO OrderItem
+      (order_id, product_id, quantity, unit_price)  
+      VALUES (?, ?, ?, ?)`,
+      [orderId, item.product_id, item.quantity, item.unit_price]
+    );
+
+      console.log(
+        `[OrderModel CreateOrder] ✅ Item inserted: product=${item.product_id}, qty=${item.quantity}, unit_price=${item.unit_price}, total=${lineTotal}`
       );
     }
 
-    // 3️⃣ Update total_amount
+    // ==================== UPDATE TOTAL AMOUNT ====================
     await connection.query(
       `UPDATE Orders
-       SET total_amount = (
-         SELECT SUM(total_price)
-         FROM OrderItem
-         WHERE order_id = ?
-       )
+       SET total_amount = ?
        WHERE id = ?`,
-      [orderId, orderId]
+      [totalAmount, orderId]
     );
 
+    console.log(`[OrderModel CreateOrder] ✅ Total amount calculated: ${totalAmount}`);
+
     await connection.commit();
+    console.log(`[OrderModel CreateOrder] ✅ Transaction committed`);
 
     return orderId;
 
   } catch (error) {
     await connection.rollback();
+    console.error("[OrderModel CreateOrder] Error:", error.message);
     throw error;
   } finally {
     connection.release();
@@ -57,7 +95,7 @@ exports.createOrder = async (storeId, userId, deliveryDate, items) => {
 };
 
 /**
- * Get Order Detail
+ * Get Order Detail with Items
  */
 exports.getOrderById = async (orderId) => {
   const [rows] = await pool.query(
@@ -70,9 +108,11 @@ exports.getOrderById = async (orderId) => {
         o.delivery_date,
         o.status,
         o.total_amount,
+        o.delivered_quantity,
         o.created_by,
         o.confirmed_by,
         o.issued_by,
+        o.received_by,
         o.created_at,
         o.updated_at,
 
@@ -87,6 +127,7 @@ exports.getOrderById = async (orderId) => {
     LEFT JOIN OrderItem oi ON o.id = oi.order_id
     LEFT JOIN Product p ON oi.product_id = p.id
     WHERE o.id = ?
+    ORDER BY oi.id ASC
     `,
     [orderId]
   );
@@ -107,14 +148,16 @@ exports.getAllOrders = async (role, storeId) => {
       o.delivery_date,
       o.status,
       o.total_amount,
-      o.created_at
+      o.delivered_quantity,
+      o.created_at,
+      o.updated_at
     FROM Orders o
   `;
 
   const params = [];
 
-  // 🔒 Nếu là FR_STAFF → chỉ xem store mình
-  if (role === "FR_STAFF") {
+  // 🔒 FR_STAFF / MANAGER chỉ xem store mình
+  if (role === "FR_STAFF" || role === "MANAGER") {
     query += ` WHERE o.store_id = ?`;
     params.push(storeId);
   }
@@ -127,8 +170,9 @@ exports.getAllOrders = async (role, storeId) => {
 };
 
 /**
- * Update Order Status
-*/  
+ * Confirm Order (CK_STAFF)
+ * SUBMITTED → CONFIRMED
+ */
 exports.confirmOrder = async (orderId, confirmedBy) => {
   const [result] = await pool.query(
     `UPDATE Orders
@@ -143,8 +187,9 @@ exports.confirmOrder = async (orderId, confirmedBy) => {
 };
 
 /**
- * Issue Order  
-*/
+ * Issue Order (CK_STAFF)
+ * CONFIRMED → ISSUED
+ */
 exports.issueOrder = async (orderId, issuedBy) => {
   const [result] = await pool.query(
     `UPDATE Orders
@@ -158,9 +203,10 @@ exports.issueOrder = async (orderId, issuedBy) => {
   return result.affectedRows;
 };
 
-/** 
- * deliver Order
-*/
+/**
+ * Deliver Order (FR_STAFF/MANAGER)
+ * ISSUED → DELIVERED
+ */
 exports.deliverOrder = async (orderId, receivedBy) => {
   const [result] = await pool.query(
     `UPDATE Orders
@@ -179,14 +225,14 @@ exports.deliverOrder = async (orderId, receivedBy) => {
  * Update delivered quantity and check if all items received
  */
 exports.updateDeliveredQuantity = async (orderId) => {
-  // 1. Lấy tổng số lượng trong order
+  // 1️⃣ Get total ordered
   const [orderRows] = await pool.query(
     `SELECT SUM(quantity) as total_ordered FROM OrderItem WHERE order_id = ?`,
     [orderId]
   );
   const totalOrdered = orderRows[0]?.total_ordered || 0;
 
-  // 2. Lấy tổng số lượng đã nhận (từ Goods Receipt đã CONFIRMED)
+  // 2️⃣ Get total received (from confirmed GoodsReceipt)
   const [receivedRows] = await pool.query(
     `SELECT SUM(gri.quantity) as total_received
      FROM GoodsReceipt gr
@@ -198,7 +244,7 @@ exports.updateDeliveredQuantity = async (orderId) => {
 
   console.log(`[Order ${orderId}] Total ordered: ${totalOrdered}, Total received: ${totalReceived}`);
 
-  // 3. Update delivered_quantity
+  // 3️⃣ Update delivered_quantity
   const [result] = await pool.query(
     `UPDATE Orders
      SET delivered_quantity = ?
@@ -206,7 +252,7 @@ exports.updateDeliveredQuantity = async (orderId) => {
     [totalReceived, orderId]
   );
 
-  // 4. Nếu đã nhận đủ hàng thì update status thành DELIVERED
+  // 4️⃣ Auto-transition to DELIVERED if all items received
   if (totalReceived >= totalOrdered && totalOrdered > 0) {
     console.log(`[Order ${orderId}] All items received, updating status to DELIVERED`);
     const [updateResult] = await pool.query(
@@ -230,6 +276,9 @@ exports.updateDeliveredQuantity = async (orderId) => {
   }
 };
 
+/**
+ * Get single order
+ */
 exports.getById = async (orderId) => {
   const [rows] = await pool.query(
     `SELECT * FROM Orders WHERE id = ?`,
@@ -238,14 +287,15 @@ exports.getById = async (orderId) => {
   return rows.length ? rows[0] : null;
 };
 
-
 /**
- * Cancel an order (only SUBMITTED orders can be cancelled)
+ * Cancel Order (only SUBMITTED)
  */
 exports.cancelOrder = async (orderId, cancelledBy) => {
   const [result] = await pool.query(
     `UPDATE Orders 
-     SET status = 'CANCELLED', updated_at = NOW(), cancelled_by = ?
+     SET status = 'CANCELLED', 
+         updated_at = NOW(), 
+         cancelled_by = ?
      WHERE id = ? AND status = 'SUBMITTED'`,
     [cancelledBy, orderId]
   );
@@ -281,4 +331,3 @@ exports.autoCancelExpiredOrders = async () => {
 
   return result.affectedRows;
 };
-

@@ -40,7 +40,7 @@ exports.createFromIssue = async ({
 
 exports.getById = async (id) => {
   const [rows] = await pool.query(
-    `SELECT gr.*, gri.product_id, gri.quantity
+    `SELECT gr.*, gri.product_id, gri.name, gri.quantity
      FROM GoodsReceipt gr
      LEFT JOIN GoodsReceiptItem gri ON gr.id = gri.goods_receipt_id
      WHERE gr.id = ?`,
@@ -64,7 +64,7 @@ exports.getById = async (id) => {
   
   rows.forEach(r => {
     if (r.product_id) {
-      base.items.push({ product_id: r.product_id, quantity: r.quantity });
+      base.items.push({ product_id: r.product_id, name: r.name, quantity: r.quantity });
     }
   });
   

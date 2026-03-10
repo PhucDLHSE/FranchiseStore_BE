@@ -21,11 +21,15 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *     description: |
  *       Create a new order with items (FR_STAFF only). Order will be in SUBMITTED status.
  *       
+ *       **✅ Unit price is AUTO-TAKEN from Product (no need to include in request)**
+ *       
  *       **Validations:**
+ *       - Product must be active (is_active=TRUE)
+ *       - Product must have unit_price set by Manager
  *       - delivery_date cannot be in the past
  *       - delivery_date must be at least 5 days from today
  *       - Must contain at least 1 item
- *       - quantity and unit_price must be > 0
+ *       - quantity must be > 0
  *     tags: [Orders]
  *     security:
  *       - bearerAuth: []
@@ -43,7 +47,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *                 type: string
  *                 format: date
  *                 description: Expected delivery date (must be today + 5 days or later)
- *                 example: "2026-03-06"
+ *                 example: "2026-03-15"
  *               items:
  *                 type: array
  *                 minItems: 1
@@ -53,43 +57,34 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *                   required:
  *                     - product_id
  *                     - quantity
- *                     - unit_price
  *                   properties:
  *                     product_id:
  *                       type: integer
- *                       description: Product ID
+ *                       description: Product ID (must be active with unit_price set)
  *                       example: 2
  *                     quantity:
  *                       type: number
  *                       description: Order quantity (must be > 0)
  *                       example: 10
- *                     unit_price:
- *                       type: number
- *                       format: float
- *                       description: Unit price (must be > 0)
- *                       example: 20000
  *           examples:
  *             single_item:
- *               summary: Order with single item
+ *               summary: Order with single item (unit_price auto-taken)
  *               value:
- *                 delivery_date: "2026-03-06"
+ *                 delivery_date: "2026-03-15"
  *                 items:
  *                   - product_id: 2
  *                     quantity: 10
- *                     unit_price: 20000
  *             multiple_items:
  *               summary: Order with multiple items
  *               value:
- *                 delivery_date: "2026-03-06"
+ *                 delivery_date: "2026-03-15"
  *                 items:
  *                   - product_id: 2
  *                     quantity: 10
- *                     unit_price: 20000
- *                   - product_id: 1
+ *                   - product_id: 3
  *                     quantity: 50
- *                     unit_price: 10000
  *     responses:
- *       200:
+ *       201:
  *         description: Order created successfully
  *         content:
  *           application/json:
@@ -108,10 +103,10 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *                     order_code:
  *                       type: string
  *                       description: Unique order code
- *                       example: "ORD-1740244800000"
+ *                       example: "ORD-20260310-A1B2"
  *                     store_id:
  *                       type: integer
- *                       example: 2
+ *                       example: 1
  *                     order_date:
  *                       type: string
  *                       format: date-time
@@ -119,37 +114,20 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *                     delivery_date:
  *                       type: string
  *                       format: date
- *                       example: "2026-03-06"
+ *                       example: "2026-03-15"
  *                     status:
  *                       type: string
  *                       enum: [SUBMITTED, CONFIRMED, ISSUED, DELIVERED, CANCELLED]
- *                       description: Order status
  *                       example: SUBMITTED
- *                     delivered_quantity:
- *                       type: integer
- *                       description: Number of items already received (0 for new order)
- *                       example: 0
  *                     total_amount:
  *                       type: number
  *                       format: float
- *                       description: Total order amount (sum of all items)
+ *                       description: Total order amount (auto-calculated)
  *                       example: 700000
  *                     created_by:
  *                       type: integer
- *                       description: User ID who created the order
+ *                       description: FR_STAFF user ID who created
  *                       example: 10
- *                     confirmed_by:
- *                       type: integer
- *                       nullable: true
- *                       description: User ID who confirmed the order
- *                     issued_by:
- *                       type: integer
- *                       nullable: true
- *                       description: User ID who issued the order
- *                     received_by:
- *                       type: integer
- *                       nullable: true
- *                       description: User ID who received/delivered the order
  *                     created_at:
  *                       type: string
  *                       format: date-time
@@ -158,7 +136,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *                       format: date-time
  *                     items:
  *                       type: array
- *                       description: List of order items
+ *                       description: List of order items with unit_price snapshot
  *                       items:
  *                         type: object
  *                         properties:
@@ -170,13 +148,14 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *                             example: 2
  *                           product_name:
  *                             type: string
- *                             example: "Product A"
+ *                             example: "Bánh mỳ thơm"
  *                           quantity:
  *                             type: number
  *                             example: 10
  *                           unit_price:
  *                             type: number
  *                             format: float
+ *                             description: Snapshot from Product.unit_price at order creation
  *                             example: 20000
  *                           total_price:
  *                             type: number
@@ -201,7 +180,8 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *                   examples:
  *                     - "Order must contain at least one item"
  *                     - "delivery_date cannot be in the past"
- *                     - "delivery_date must be at least 5 days from today"
+ *                     - "Product is not active"
+ *                     - "Product has no unit_price set"
  *       401:
  *         description: Unauthorized - Missing or invalid token
  *       403:

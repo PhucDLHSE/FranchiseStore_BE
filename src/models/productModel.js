@@ -1,16 +1,18 @@
 const pool = require("../configs/database");
 
 /**
- * Base select fields
+ * Base select fields - ✅ Thêm unit_price, sale_price
  */
 const BASE_SELECT = `
   p.id,
   p.category_id,
   c.name AS category_name,
+  p.recipe_id,
   p.name,
   p.sku,
   p.image_url,
   p.uom,
+  p.unit_price,
   p.is_active,
   p.created_at,
   p.updated_at,
@@ -35,7 +37,7 @@ exports.findAll = async () => {
 };
 
 /**
- * Get product by id
+ * Get product by id - ✅ Thêm unit_price, sale_price
  * Support both getById (new) and findById (legacy)
  */
 exports.getById = async (id) => {
@@ -56,7 +58,7 @@ exports.getById = async (id) => {
 exports.findById = exports.getById;
 
 /**
- * Get all products with filters
+ * Get all products with filters - ✅ Thêm filter is_active
  */
 exports.getAll = async (filters = {}) => {
   let sql = `
@@ -76,6 +78,11 @@ exports.getAll = async (filters = {}) => {
   if (filters.is_active !== undefined) {
     sql += ` AND p.is_active = ?`;
     params.push(filters.is_active);
+  }
+
+  if (filters.recipe_id) {
+    sql += ` AND p.recipe_id = ?`;
+    params.push(filters.recipe_id);
   }
 
   if (filters.search) {
@@ -135,7 +142,7 @@ exports.exists = async (id) => {
 };
 
 /**
- * Create product
+ * Create product - ✅ Thêm unit_price, sale_price (default NULL), is_active (default FALSE)
  */
 exports.create = async ({
   category_id,
@@ -143,14 +150,16 @@ exports.create = async ({
   sku,
   image_url,
   uom,
-  is_active = true,
-  created_by,
-  recipe_id = null
+  recipe_id = null,
+  unit_price = null,
+  sale_price = null,
+  is_active = false,
+  created_by
 }) => {
   const sql = `
     INSERT INTO Product
-    (category_id, name, sku, image_url, uom, is_active, created_by, recipe_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    (category_id, name, sku, image_url, uom, recipe_id, unit_price, sale_price, is_active, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   const [result] = await pool.query(sql, [
@@ -159,16 +168,18 @@ exports.create = async ({
     sku || null,
     image_url || null,
     uom,
+    recipe_id || null,
+    unit_price || null,
+    sale_price || null,
     is_active,
-    created_by || null,
-    recipe_id || null
+    created_by || null
   ]);
 
   return result.insertId;
 };
 
 /**
- * Update product (partial update)
+ * Update product (partial update) - 
  */
 exports.update = async (id, data) => {
   const allowedFields = [
@@ -177,8 +188,9 @@ exports.update = async (id, data) => {
     "sku",
     "image_url",
     "uom",
-    "is_active",
     "recipe_id",
+    "unit_price",
+    "is_active",
     "updated_by"
   ];
 
@@ -214,6 +226,23 @@ exports.update = async (id, data) => {
  */
 exports.updateById = async (id, data) => {
   return exports.update(id, data);
+};
+
+/**
+ * ✅ Set unit price (vốn) - Auto-activate product
+ */
+exports.setUnitPrice = async (id, unit_price, updated_by) => {
+  const sql = `
+    UPDATE Product
+    SET unit_price = ?,
+        is_active = TRUE,
+        updated_by = ?,
+        updated_at = NOW()
+    WHERE id = ? AND deleted_at IS NULL
+  `;
+
+  const [result] = await pool.query(sql, [unit_price, updated_by || null, id]);
+  return result.affectedRows > 0;
 };
 
 /**
@@ -265,7 +294,7 @@ exports.countByCategory = async (category_id) => {
 };
 
 /**
- * Get by recipe
+ * Get by recipe - ✅ Include pricing info
  */
 exports.getByRecipe = async (recipe_id) => {
   const sql = `
@@ -299,3 +328,5 @@ exports.skuExists = async (sku, excludeId = null) => {
   const [rows] = await pool.query(sql, params);
   return rows.length > 0;
 };
+
+module.exports = exports;

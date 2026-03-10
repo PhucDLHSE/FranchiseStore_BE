@@ -1,71 +1,146 @@
 const orderModel = require('../models/orderModel');
-const reservationModel = require("../models/reservationModel");
+const productModel = require('../models/productModel');
+const inventoryModel = require('../models/inventoryModel');
 const response = require('../utils/response');
 const ERROR = require('../utils/errorCodes');
 
 /**
- * Create Order
+ * Create Order (FR_STAFF/MANAGER)
+ * Step 4 of workflow: unit_price auto-taken from Product
+ * POST /api/orders
  */
 exports.createOrder = async (req, res) => {
   try {
     const { delivery_date, items } = req.body;
     const user = req.user;
 
-    // ✅ Validate items
+    console.log(`[Order Create] ${user.role} ${user.id} creating order for store ${user.store_id}`);
+
+    // ==================== VALIDATION ====================
     if (!items || items.length === 0) {
-      return response.error(res, {
-        code: 400,
-        message: "Order must contain at least one item"
-      });
+      return response.error(res, ERROR.BAD_REQUEST, "Order must contain at least one item");
     }
 
-    // ✅ Validate delivery_date
     if (!delivery_date) {
-      return response.error(res, {
-        code: 400,
-        message: "delivery_date is required"
-      });
+      return response.error(res, ERROR.BAD_REQUEST, "delivery_date is required");
     }
 
     const deliveryDateObj = new Date(delivery_date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // không được truyền ngày trong quá khứ
+    // ✅ delivery_date không được trong quá khứ
     if (deliveryDateObj < today) {
-      return response.error(res, {
-        code: 400,
-        message: "delivery_date cannot be in the past"
-      });
+      return response.error(
+        res,
+        ERROR.BAD_REQUEST,
+        "delivery_date cannot be in the past"
+      );
     }
 
-    // phải cách ngày tạo order ít nhất 5 ngày
+    // ✅ delivery_date phải cách ngày tạo ít nhất 5 ngày
     const minDeliveryDate = new Date(today);
     minDeliveryDate.setDate(minDeliveryDate.getDate() + 5);
 
     if (deliveryDateObj < minDeliveryDate) {
-      return response.error(res, {
-        code: 400,
-        message: "delivery_date must be at least 5 days from today"
+      return response.error(
+        res,
+        ERROR.BAD_REQUEST,
+        "delivery_date must be at least 5 days from today"
+      );
+    }
+
+    // ==================== VALIDATE ITEMS ====================
+    // items contains: product_id, quantity (unit_price NOT in body)
+    const validatedItems = [];
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+
+      if (!item.product_id || item.quantity === undefined) {
+        return response.error(
+          res,
+          ERROR.BAD_REQUEST,
+          `Item [${i}] missing: product_id, quantity`
+        );
+      }
+
+      if (typeof item.quantity !== "number" || item.quantity <= 0) {
+        return response.error(
+          res,
+          ERROR.BAD_REQUEST,
+          `Item [${i}] quantity must be > 0`
+        );
+      }
+
+      // ✅ GET PRODUCT + VERIFY
+      const product = await productModel.getById(item.product_id);
+
+      if (!product) {
+        return response.error(
+          res,
+          ERROR.NOT_FOUND,
+          `Item [${i}] Product ${item.product_id} not found`
+        );
+      }
+
+      // ✅ Verify product is ACTIVE
+      if (!product.is_active) {
+        return response.error(
+          res,
+          ERROR.BAD_REQUEST,
+          `Item [${i}] Product "${product.name}" is not active. Manager must set unit_price first.`
+        );
+      }
+
+      // ✅ Verify unit_price is set
+      if (!product.unit_price) {
+        return response.error(
+          res,
+          ERROR.BAD_REQUEST,
+          `Item [${i}] Product "${product.name}" has no unit_price set`
+        );
+      }
+
+      // ✅ Check duplicate product in same order
+      if (validatedItems.some(v => v.product_id === item.product_id)) {
+        return response.error(
+          res,
+          ERROR.BAD_REQUEST,
+          `Item [${i}] Product "${product.name}" appears multiple times in order`
+        );
+      }
+
+      validatedItems.push({
+        product_id: item.product_id,
+        product_name: product.name,
+        quantity: item.quantity,
+        unit_price: parseFloat(product.unit_price)  // ✅ SNAPSHOT from Product
       });
+
+      console.log(
+        `[Order Create] ✅ Item [${i}]: ${product.name} × ${item.quantity} @ ${product.unit_price} = ${item.quantity * product.unit_price}`
+      );
     }
 
     const storeId = user.store_id;
     const userId = user.id;
 
-    // 1️⃣ Create order (transaction handled in model)
+    // ==================== CREATE ORDER ====================
     const orderId = await orderModel.createOrder(
       storeId,
       userId,
       delivery_date,
-      items
+      validatedItems  // ✅ Pass validated items with unit_price snapshot
     );
 
-    // 2️⃣ Fetch full order detail
+    console.log(`[Order Create] ✅ Order created: ID=${orderId}`);
+
+    // ==================== FETCH FULL ORDER ====================
     const rows = await orderModel.getOrderById(orderId);
 
     if (!rows || rows.length === 0) {
-      return response.error(res, ERROR.INTERNAL_ERROR);
+      return response.error(res, ERROR.INTERNAL_ERROR, "Failed to retrieve created order");
     }
 
     const orderInfo = {
@@ -97,15 +172,15 @@ exports.createOrder = async (req, res) => {
       }
     });
 
-    return response.success(
-      res,
-      orderInfo,
-      "Order created successfully"
+    console.log(
+      `[Order Create] ✅ Order created successfully with ${orderInfo.items.length} items, total: ${orderInfo.total_amount}`
     );
 
+    return response.success(res, orderInfo, "Order created successfully", 201);
+
   } catch (error) {
-    console.error(error);
-    return response.error(res, { code: 500, message: "Internal server error" });
+    console.error("[Order Create] Error:", error);
+    return response.error(res, ERROR.INTERNAL_ERROR, error.message);
   }
 };
 
@@ -120,9 +195,7 @@ exports.getOrderDetail = async (req, res) => {
     const rows = await orderModel.getOrderById(orderId);
 
     if (!rows || rows.length === 0) {
-      return res.status(404).json({
-        message: "Order not found"
-      });
+      return response.error(res, ERROR.NOT_FOUND, "Order not found");
     }
 
     const orderInfo = {
@@ -142,13 +215,9 @@ exports.getOrderDetail = async (req, res) => {
     };
 
     // 🔒 Store chỉ xem được order của mình
-    if (
-      user.role === "FR_STAFF" || user.role === "MANAGER"
-    ) {
+    if ((user.role === "FR_STAFF" || user.role === "MANAGER")) {
       if (user.store_id !== orderInfo.store_id) {
-        return res.status(403).json({
-          message: "You are not allowed to view this order"
-        });
+        return response.error(res, ERROR.FORBIDDEN, "You are not allowed to view this order");
       }
     }
 
@@ -165,12 +234,10 @@ exports.getOrderDetail = async (req, res) => {
       }
     });
 
-    return res.status(200).json(orderInfo);
+    return response.success(res, orderInfo);
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      message: "Internal server error"
-    });
+    console.error("[Order GetDetail] Error:", error);
+    return response.error(res, ERROR.INTERNAL_ERROR);
   }
 };
 
@@ -181,19 +248,16 @@ exports.getAllOrders = async (req, res) => {
   try {
     const user = req.user;
 
-    const orders = await orderModel.getAllOrders(
-      user.role,
-      user.store_id
-    );
+    console.log(`[Order GetAll] ${user.role} ${user.id} fetching orders`);
 
-    return response.success(
-      res,
-      orders,
-      "Orders retrieved successfully"
-    );
+    const orders = await orderModel.getAllOrders(user.role, user.store_id);
+
+    console.log(`[Order GetAll] ✅ Found ${orders.length} orders`);
+
+    return response.success(res, orders, "Orders retrieved successfully");
 
   } catch (error) {
-    console.error(error);
+    console.error("[Order GetAll] Error:", error);
     return response.error(res, ERROR.INTERNAL_ERROR);
   }
 };
@@ -206,13 +270,16 @@ exports.confirmOrder = async (req, res) => {
     const orderId = req.params.id;
     const user = req.user;
 
+    console.log(`[Order Confirm] CK_STAFF ${user.id} confirming order ${orderId}`);
+
     const affected = await orderModel.confirmOrder(orderId, user.id);
 
     if (affected === 0) {
-      return response.error(res, {
-        code: 400,
-        message: "Order cannot be confirmed (not found or invalid status)"
-      });
+      return response.error(
+        res,
+        ERROR.BAD_REQUEST,
+        "Order cannot be confirmed (not found or invalid status)"
+      );
     }
 
     const rows = await orderModel.getOrderById(orderId);
@@ -249,9 +316,11 @@ exports.confirmOrder = async (req, res) => {
       }
     });
 
+    console.log(`[Order Confirm] ✅ Order confirmed`);
+
     return response.success(res, orderInfo, "Order confirmed successfully");
   } catch (error) {
-    console.error(error);
+    console.error("[Order Confirm] Error:", error);
     return response.error(res, ERROR.INTERNAL_ERROR);
   }
 };
@@ -264,13 +333,16 @@ exports.issueOrder = async (req, res) => {
     const orderId = req.params.id;
     const user = req.user;
 
+    console.log(`[Order Issue] CK_STAFF ${user.id} issuing order ${orderId}`);
+
     const affected = await orderModel.issueOrder(orderId, user.id);
 
     if (affected === 0) {
-      return response.error(res, {
-        code: 400,
-        message: "Order cannot be issued (not found or invalid status)"
-      });
+      return response.error(
+        res,
+        ERROR.BAD_REQUEST,
+        "Order cannot be issued (not found or invalid status)"
+      );
     }
 
     const rows = await orderModel.getOrderById(orderId);
@@ -307,9 +379,11 @@ exports.issueOrder = async (req, res) => {
       }
     });
 
+    console.log(`[Order Issue] ✅ Order issued`);
+
     return response.success(res, orderInfo, "Order issued successfully");
   } catch (error) {
-    console.error(error);
+    console.error("[Order Issue] Error:", error);
     return response.error(res, ERROR.INTERNAL_ERROR);
   }
 };
@@ -322,21 +396,28 @@ exports.deliverOrder = async (req, res) => {
   try {
     const orderId = req.params.id;
     const user = req.user;
+
+    console.log(`[Order Deliver] ${user.role} ${user.id} marking order ${orderId} as delivered`);
+
     const rows = await orderModel.getOrderById(orderId);
 
     if (!rows || rows.length === 0) {
-      return response.error(res, { code: 404, message: "Order not found" });
+      return response.error(res, ERROR.NOT_FOUND, "Order not found");
     }
 
-    // Store-level guard: FR_STAFF / MANAGER only allowed for their store
+    // 🔒 Store-level guard: FR_STAFF / MANAGER only allowed for their store
     if ((user.role === "FR_STAFF" || user.role === "MANAGER") && rows[0].store_id !== user.store_id) {
-      return response.error(res, { code: 403, message: "You are not allowed to mark this order delivered" });
+      return response.error(res, ERROR.FORBIDDEN, "You are not allowed to mark this order delivered");
     }
 
     const affected = await orderModel.deliverOrder(orderId, user.id);
 
     if (affected === 0) {
-      return response.error(res, { code: 400, message: "Order cannot be marked delivered (not found or invalid status)" });
+      return response.error(
+        res,
+        ERROR.BAD_REQUEST,
+        "Order cannot be marked delivered (not found or invalid status)"
+      );
     }
 
     const updatedRows = await orderModel.getOrderById(orderId);
@@ -374,10 +455,12 @@ exports.deliverOrder = async (req, res) => {
       }
     });
 
+    console.log(`[Order Deliver] ✅ Order marked as delivered`);
+
     return response.success(res, orderInfo, "Order marked as delivered");
   } catch (error) {
-    console.error(error);
-    return response.error(res, { code: 500, message: "Internal server error" });
+    console.error("[Order Deliver] Error:", error);
+    return response.error(res, ERROR.INTERNAL_ERROR, error.message);
   }
 };
 
@@ -391,48 +474,46 @@ exports.cancelOrder = async (req, res) => {
     const orderId = req.params.id;
     const user = req.user;
 
-    // 1. Check if order exists
+    console.log(`[Order Cancel] ${user.role} ${user.id} cancelling order ${orderId}`);
+
+    // 1️⃣ Check if order exists
     const order = await orderModel.getOrderById(orderId);
     if (!order || order.length === 0) {
       return response.error(res, ERROR.NOT_FOUND, "Order not found");
     }
 
-    // 2. Check if user has permission (must be from same store or MANAGER/ADMIN)
+    // 2️⃣ Check if user has permission
     const orderStoreId = order[0].store_id;
     if (user.store_id !== orderStoreId && user.role !== "ADMIN" && user.role !== "MANAGER") {
       return response.error(res, ERROR.FORBIDDEN, "You cannot cancel orders from other stores");
     }
 
-    // 3. Check order status (only SUBMITTED can be cancelled)
+    // 3️⃣ Check order status (only SUBMITTED can be cancelled)
     const orderStatus = order[0].status;
     console.log(`[Order Cancel] Order ${orderId}: current status = ${orderStatus}`);
 
     if (orderStatus !== "SUBMITTED") {
       return response.error(
         res,
-        { code: 400, message: "Cannot cancel order" },
+        ERROR.BAD_REQUEST,
         `Order can only be cancelled in SUBMITTED status. Current status: ${orderStatus}`
       );
     }
 
-    // 4. Cancel the order
+    // 4️⃣ Cancel the order
     const affected = await orderModel.cancelOrder(orderId, user.id);
     if (!affected) {
-      return response.error(
-        res,
-        { code: 400, message: "Cannot cancel order" },
-        "Failed to cancel order"
-      );
+      return response.error(res, ERROR.BAD_REQUEST, "Failed to cancel order");
     }
 
-    console.log(`[Order Cancel] ✅ Order ${orderId} cancelled by user ${user.id}`);
+    console.log(`[Order Cancel] ✅ Order cancelled`);
 
-    // 5. Get updated order
+    // 5️⃣ Get updated order
     const updatedOrder = await orderModel.getOrderById(orderId);
     return response.success(res, updatedOrder[0], "Order cancelled successfully");
 
   } catch (err) {
     console.error("[Order Cancel] Error:", err);
-    return response.error(res, ERROR.INTERNAL_ERROR);
+    return response.error(res, ERROR.INTERNAL_ERROR, err.message);
   }
 };
