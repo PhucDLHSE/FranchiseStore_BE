@@ -13,6 +13,186 @@ const { requireFRStaff } = require("../middlewares/roleMiddleware.js");
 
 /**
  * @swagger
+ * /goods-receipts/payment-summary:
+ *   get:
+ *     summary: Get total payment summary for all Goods Receipts in store
+ *     description: |
+ *       **FR_STAFF/MANAGER** - Get comprehensive payment summary for ALL goods receipts in the store.
+ *       
+ *       **Purpose:** Track total money the FR Store has paid for all received goods.
+ *       
+ *       **Key Metrics:**
+ *       - `total_receipts`: Total number of goods receipts
+ *       - `confirmed_receipts`: Number of CONFIRMED receipts (money paid)
+ *       - `created_receipts`: Number of CREATED receipts (pending confirmation)
+ *       - `total_paid_confirmed`: Total amount of CONFIRMED receipts (money actually paid)
+ *       - `total_paid_pending`: Total amount of CREATED receipts (pending confirmation)
+ *       - `total_paid_amount`: Total amount of all receipts (paid + pending)
+ *       
+ *       **Optional Query Parameters:**
+ *       - `start_date`: Filter from date (format: YYYY-MM-DD)
+ *       - `end_date`: Filter to date (format: YYYY-MM-DD)
+ *       
+ *       **Example 1: All Goods Receipts**
+ *       ```
+ *       GET /goods-receipts/payment-summary
+ *       Response:
+ *       {
+ *         "total_receipts": 5,
+ *         "confirmed_receipts": 3,
+ *         "created_receipts": 2,
+ *         "total_paid_confirmed": 5,000,000,
+ *         "total_paid_pending": 2,000,000,
+ *         "total_paid_amount": 7,000,000
+ *       }
+ *       ```
+ *       
+ *       **Example 2: Goods Receipts in March 2026**
+ *       ```
+ *       GET /goods-receipts/payment-summary?start_date=2026-03-01&end_date=2026-03-31
+ *       Response:
+ *       {
+ *         "period": {
+ *           "start_date": "2026-03-01",
+ *           "end_date": "2026-03-31"
+ *         },
+ *         "receipts": [...],
+ *         "payment_summary": {
+ *           "total_paid_confirmed": 3,500,000,
+ *           "total_paid_pending": 1,500,000,
+ *           "total_paid_amount": 5,000,000
+ *         }
+ *       }
+ *       ```
+ *     tags: [Goods Receipt]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: start_date
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter from date (optional, format YYYY-MM-DD)
+ *         example: "2026-03-01"
+ *       - in: query
+ *         name: end_date
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter to date (optional, format YYYY-MM-DD)
+ *         example: "2026-03-31"
+ *     responses:
+ *       200:
+ *         description: Store payment summary for all goods receipts
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     store_id:
+ *                       type: integer
+ *                       example: 2
+ *                     period:
+ *                       type: object
+ *                       description: Only included when date filters are used
+ *                       properties:
+ *                         start_date:
+ *                           type: string
+ *                           format: date
+ *                         end_date:
+ *                           type: string
+ *                           format: date
+ *                     goods_receipts_summary:
+ *                       type: object
+ *                       properties:
+ *                         total_receipts:
+ *                           type: integer
+ *                           description: Total number of receipts
+ *                           example: 5
+ *                         confirmed_receipts:
+ *                           type: integer
+ *                           description: Number of CONFIRMED receipts
+ *                           example: 3
+ *                         created_receipts:
+ *                           type: integer
+ *                           description: Number of CREATED receipts (pending)
+ *                           example: 2
+ *                         total_items:
+ *                           type: integer
+ *                           description: Total number of items received
+ *                           example: 25
+ *                         receipts:
+ *                           type: array
+ *                           items:
+ *                             type: object
+ *                             properties:
+ *                               receipt_id:
+ *                                 type: integer
+ *                               receipt_code:
+ *                                 type: string
+ *                               order_id:
+ *                                 type: integer
+ *                               status:
+ *                                 type: string
+ *                                 enum: [CREATED, CONFIRMED]
+ *                               created_at:
+ *                                 type: string
+ *                               receipt_total:
+ *                                 type: number
+ *                               items:
+ *                                 type: array
+ *                     payment_summary:
+ *                       type: object
+ *                       description: Total payment breakdown
+ *                       properties:
+ *                         total_paid_confirmed:
+ *                           type: number
+ *                           description: Money paid (CONFIRMED receipts only)
+ *                           example: 5000000
+ *                         total_paid_pending:
+ *                           type: number
+ *                           description: Money pending (CREATED receipts)
+ *                           example: 2000000
+ *                         total_paid_amount:
+ *                           type: number
+ *                           description: Total amount (paid + pending)
+ *                           example: 7000000
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Invalid date format or date range
+ *       401:
+ *         description: Unauthorized - Missing or invalid token
+ *       403:
+ *         description: Forbidden - Only FR_STAFF allowed
+ *       500:
+ *         description: Internal server error
+ */
+// ✅ SPECIFIC ROUTE FIRST (before dynamic :id)
+router.get(
+  "/goods-receipts/payment-summary",
+  verifyToken,
+  requireFRStaff,
+  async (req, res) => {
+    const { start_date, end_date } = req.query;
+    
+    if (start_date && end_date) {
+      return grController.getStorePaymentSummaryByDateRange(req, res);
+    } else {
+      return grController.getStorePaymentSummary(req, res);
+    }
+  }
+);
+
+/**
+ * @swagger
  * /goods-receipts:
  *   get:
  *     summary: List goods receipts for current store (FR_STAFF only)
@@ -54,6 +234,10 @@ const { requireFRStaff } = require("../middlewares/roleMiddleware.js");
  *                       status:
  *                         type: string
  *                         enum: [CREATED, CONFIRMED]
+ *                       item_count:
+ *                         type: integer
+ *                       total_amount:
+ *                         type: number
  *                       created_at:
  *                         type: string
  *       401:
@@ -74,9 +258,16 @@ router.get(
  * @swagger
  * /goods-receipts/{id}:
  *   get:
- *     summary: Get a single goods receipt detail (FR_STAFF only)
+ *     summary: Get a single goods receipt detail with full item information
  *     description: |
  *       **FR_STAFF only.** Retrieve detailed information of a specific Goods Receipt with all items.
+ *       
+ *       **Response includes:**
+ *       - Product name, SKU, UOM
+ *       - Unit price (cost from Order)
+ *       - Quantity received
+ *       - Total price (quantity × unit_price)
+ *       - Receipt total amount
  *       
  *       This allows FR_STAFF to verify items before confirming receipt.
  *     tags: [Goods Receipt]
@@ -92,7 +283,7 @@ router.get(
  *         example: 1
  *     responses:
  *       200:
- *         description: Goods Receipt details
+ *         description: Goods Receipt details with full item information
  *         content:
  *           application/json:
  *             schema:
@@ -123,15 +314,33 @@ router.get(
  *                       type: string
  *                       enum: [CREATED, CONFIRMED]
  *                       example: "CREATED"
+ *                     total_amount:
+ *                       type: number
+ *                       description: Total cost of all items in receipt
+ *                       example: 400000
  *                     items:
  *                       type: array
  *                       items:
  *                         type: object
  *                         properties:
+ *                           item_id:
+ *                             type: integer
  *                           product_id:
  *                             type: integer
+ *                           product_name:
+ *                             type: string
+ *                           sku:
+ *                             type: string
+ *                           uom:
+ *                             type: string
+ *                           unit_price:
+ *                             type: number
+ *                             description: Cost per unit
  *                           quantity:
  *                             type: integer
+ *                           total_price:
+ *                             type: number
+ *                             description: quantity × unit_price
  *                     created_at:
  *                       type: string
  *       401:
@@ -143,6 +352,7 @@ router.get(
  *       500:
  *         description: Internal server error
  */
+// ✅ DYNAMIC ROUTE LAST (after all specific routes)
 router.get(
   "/goods-receipts/:id",
   verifyToken,
@@ -203,10 +413,12 @@ router.get(
  *                     status:
  *                       type: string
  *                       example: "CONFIRMED"
+ *                     total_amount:
+ *                       type: number
  *                 message:
  *                   type: string
  *                   examples:
- *                     - "Goods receipt confirmed"
+ *                     - "Goods receipt confirmed successfully"
  *       400:
  *         description: Invalid state (not CREATED or already confirmed)
  *         content:
@@ -220,8 +432,7 @@ router.get(
  *                 message:
  *                   type: string
  *                   examples:
- *                     - "Cannot confirm"
- *                     - "Already confirmed"
+ *                     - "Cannot confirm: Receipt status is CONFIRMED"
  *       401:
  *         description: Unauthorized - Missing or invalid token
  *       403:
