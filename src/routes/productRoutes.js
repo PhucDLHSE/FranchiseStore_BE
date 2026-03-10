@@ -14,7 +14,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
 
 /**
  * @swagger
- * /api/products:
+ * /products:
  *   get:
  *     summary: Get all products with filters
  *     tags: [Product]
@@ -42,7 +42,7 @@ router.get("/products", productController.getAll);
 
 /**
  * @swagger
- * /api/products/{id}:
+ * /products/{id}:
  *   get:
  *     summary: Get product by ID (with unit_price, sale_price, is_active)
  *     tags: [Product]
@@ -62,7 +62,7 @@ router.get("/products/:id", productController.getById);
 
 /**
  * @swagger
- * /api/products:
+ *  /products:
  *   post:
  *     summary: Create product from recipe (MANAGER)
  *     tags: [Product]
@@ -109,7 +109,7 @@ router.post(
 
 /**
  * @swagger
- * /api/products/{id}:
+ * /products/{id}:
  *   put:
  *     summary: Update product (MANAGER - basic info only)
  *     tags: [Product]
@@ -150,7 +150,7 @@ router.put(
 
 /**
  * @swagger
- * /api/products/{id}/set-unit-price:
+ * /products/{id}/set-unit-price:
  *   patch:
  *     summary: Set unit price (MANAGER) - Activates product
  *     tags: [Product]
@@ -187,7 +187,7 @@ router.patch(
 
 /**
  * @swagger
- * /api/products/{id}/set-sale-price:
+ * /products/{id}/set-sale-price:
  *   patch:
  *     summary: Set sale price (FR_STAFF/MANAGER) - After production completed
  *     tags: [Product]
@@ -224,7 +224,7 @@ router.patch(
 
 /**
  * @swagger
- * /api/products/{id}:
+ * /products/{id}:
  *   delete:
  *     summary: Delete product (MANAGER - soft delete)
  *     tags: [Product]

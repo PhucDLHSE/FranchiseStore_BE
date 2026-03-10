@@ -14,7 +14,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
 
 /**
  * @swagger
- * /api/sales-orders:
+ * /sales-orders:
  *   post:
  *     summary: Create Sales Order
  *     tags: [SalesOrders]
@@ -68,7 +68,7 @@ router.post(
 
 /**
  * @swagger
- * /api/sales-orders:
+ * /sales-orders:
  *   get:
  *     summary: Get all sales orders for store
  *     tags: [SalesOrders]
@@ -92,7 +92,7 @@ router.get(
 
 /**
  * @swagger
- * /api/sales-orders/{id}:
+ * /sales-orders/{id}:
  *   get:
  *     summary: Get sales order detail
  *     tags: [SalesOrders]
@@ -116,7 +116,7 @@ router.get(
 
 /**
  * @swagger
- * /api/sales-orders/{id}/confirm:
+ * /sales-orders/{id}/confirm:
  *   patch:
  *     summary: Confirm Sales Order (PENDING -> CONFIRMED)
  *     tags: [SalesOrders]
@@ -135,7 +135,7 @@ router.patch(
 
 /**
  * @swagger
- * /api/sales-orders/{id}/pack:
+ * /sales-orders/{id}/pack:
  *   patch:
  *     summary: Pack Sales Order (CONFIRMED -> PACKED)
  *     tags: [SalesOrders]
@@ -154,7 +154,7 @@ router.patch(
 
 /**
  * @swagger
- * /api/sales-orders/{id}/deliver:
+ * /sales-orders/{id}/deliver:
  *   patch:
  *     summary: Deliver Sales Order & Deduct Inventory
  *     tags: [SalesOrders]
@@ -173,7 +173,7 @@ router.patch(
 
 /**
  * @swagger
- * /api/sales-orders/{id}/cancel:
+ * /sales-orders/{id}/cancel:
  *   patch:
  *     summary: Cancel Sales Order
  *     tags: [SalesOrders]
@@ -192,7 +192,7 @@ router.patch(
 
 /**
  * @swagger
- * /api/sales-orders/{id}/payment:
+ * /sales-orders/{id}/payment:
  *   patch:
  *     summary: Record Payment
  *     tags: [SalesOrders]

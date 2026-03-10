@@ -14,7 +14,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
 
 /**
  * @swagger
- * /api/store-pricing/{productId}/set-sale-price:
+ * /store-pricing/{productId}/set-sale-price:
  *   patch:
  *     summary: Set sale price for store (FR_STAFF/MANAGER)
  *     tags: [StorePricing]
@@ -56,7 +56,7 @@ router.patch(
 
 /**
  * @swagger
- * /api/store-pricing/{productId}:
+ * /store-pricing/{productId}:
  *   get:
  *     summary: Get current sale price for store
  *     tags: [StorePricing]
@@ -80,7 +80,7 @@ router.get(
 
 /**
  * @swagger
- * /api/store-pricing:
+ * /store-pricing:
  *   get:
  *     summary: Get all store product pricings
  *     tags: [StorePricing]
@@ -98,7 +98,7 @@ router.get(
 
 /**
  * @swagger
- * /api/store-pricing/{productId}/history:
+ * /store-pricing/{productId}/history:
  *   get:
  *     summary: Get pricing history for product
  *     tags: [StorePricing]
@@ -127,7 +127,7 @@ router.get(
 
 /**
  * @swagger
- * /api/store-pricing/products/available:
+ *  /store-pricing/products/available:
  *   get:
  *     summary: Get all products with sale price (for shop)
  *     tags: [StorePricing]
@@ -182,7 +182,7 @@ router.get(
 
 /**
  * @swagger
- * /api/store-pricing/products/without-pricing:
+ * /store-pricing/products/without-pricing:
  *   get:
  *     summary: Get products without sale price set
  *     tags: [StorePricing]
@@ -209,7 +209,7 @@ router.get(
 
 /**
  * @swagger
- * /api/store-pricing/statistics:
+ * /store-pricing/statistics:
  *   get:
  *     summary: Get pricing statistics for store
  *     tags: [StorePricing]
