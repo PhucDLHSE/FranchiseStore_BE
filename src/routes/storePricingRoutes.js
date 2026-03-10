@@ -38,11 +38,6 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *               sale_price:
  *                 type: number
  *                 example: 75000
- *               effective_date:
- *                 type: string
- *                 format: date
- *                 description: When price becomes effective (optional, default today)
- *                 example: "2026-03-15"
  *     responses:
  *       200:
  *         description: Sale price set for store

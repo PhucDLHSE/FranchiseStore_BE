@@ -187,43 +187,6 @@ router.patch(
 
 /**
  * @swagger
- * /products/{id}/set-sale-price:
- *   patch:
- *     summary: Set sale price (FR_STAFF/MANAGER) - After production completed
- *     tags: [Product]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - sale_price
- *             properties:
- *               sale_price:
- *                 type: number
- *                 example: 75000
- *     responses:
- *       200:
- *         description: Sale price set
- */
-router.patch(
-  "/products/:id/set-sale-price",
-  verifyToken,
-  requireRoles(["FR_STAFF", "MANAGER"]),
-  productController.setSalePrice
-);
-
-/**
- * @swagger
  * /products/{id}:
  *   delete:
  *     summary: Delete product (MANAGER - soft delete)
