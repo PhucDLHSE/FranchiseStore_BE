@@ -39,14 +39,36 @@ exports.create = async ({
   }
 };
 
+/**
+ * ✅ FIXED: Get Goods Issue by ID with full item info (including product names)
+ */
 exports.getById = async (issueId) => {
   const [rows] = await pool.query(
-    `SELECT gi.*, gii.product_id, gii.name, gii.quantity
+    `SELECT 
+      gi.id,
+      gi.issue_code,
+      gi.order_id,
+      gi.store_from,
+      gi.store_to,
+      gi.status,
+      gi.created_by,
+      gi.completed_by,
+      gi.created_at,
+      gi.updated_at,
+      
+      gii.id AS item_id,
+      gii.product_id,
+      p.name AS product_name,
+      p.sku,
+      gii.quantity
      FROM GoodsIssue gi
      LEFT JOIN GoodsIssueItem gii ON gi.id = gii.goods_issue_id
-     WHERE gi.id = ?`,
+     LEFT JOIN Product p ON gii.product_id = p.id
+     WHERE gi.id = ?
+     ORDER BY gii.id ASC`,
     [issueId]
   );
+
   if (!rows.length) return null;
   
   const base = {
@@ -64,14 +86,23 @@ exports.getById = async (issueId) => {
   };
   
   rows.forEach(r => {
-    if (r.product_id) {  // Tránh thêm items rỗng từ LEFT JOIN
-      base.items.push({ product_id: r.product_id, name: r.name, quantity: r.quantity });
+    if (r.product_id) {
+      base.items.push({
+        item_id: r.item_id,
+        product_id: r.product_id,
+        product_name: r.product_name,
+        sku: r.sku,
+        quantity: r.quantity
+      });
     }
   });
   
   return base;
 };
 
+/**
+ * ✅ FIXED: Complete Goods Issue
+ */
 exports.complete = async (issueId, userId) => {
   const [res] = await pool.query(
     `UPDATE GoodsIssue
@@ -84,26 +115,61 @@ exports.complete = async (issueId, userId) => {
   return res.affectedRows;
 };
 
+/**
+ * ✅ FIXED: List Goods Issues by Store
+ */
 exports.listByStore = async (storeId) => {
   const [rows] = await pool.query(
-    `SELECT * FROM GoodsIssue
-     WHERE store_from = ?
-     ORDER BY created_at DESC`,
+    `SELECT 
+      gi.id,
+      gi.issue_code,
+      gi.order_id,
+      gi.store_from,
+      gi.store_to,
+      gi.status,
+      gi.created_by,
+      gi.completed_by,
+      gi.created_at,
+      gi.updated_at,
+      COUNT(gii.id) AS item_count
+     FROM GoodsIssue gi
+     LEFT JOIN GoodsIssueItem gii ON gi.id = gii.goods_issue_id
+     WHERE gi.store_from = ?
+     GROUP BY gi.id
+     ORDER BY gi.created_at DESC`,
     [storeId]
   );
   return rows;
 };
 
 /**
- * Get all GI by order ID (including items)
+ * ✅ FIXED: Get all GI by order ID (including items with product names)
  */
 exports.getByOrderId = async (orderId) => {
   const [rows] = await pool.query(
-    `SELECT gi.*, gii.product_id, gii.name, gii.quantity
+    `SELECT 
+      gi.id,
+      gi.issue_code,
+      gi.order_id,
+      gi.store_from,
+      gi.store_to,
+      gi.status,
+      gi.created_by,
+      gi.completed_by,
+      gi.created_at,
+      gi.updated_at,
+      
+      gii.id AS item_id,
+      gii.product_id,
+      p.name AS product_name,
+      p.sku,
+      gii.quantity
      FROM GoodsIssue gi
      LEFT JOIN GoodsIssueItem gii ON gi.id = gii.goods_issue_id
-     WHERE gi.order_id = ? AND gi.status IN ('CREATED', 'COMPLETED')
-     ORDER BY gi.id, gii.id`,
+     LEFT JOIN Product p ON gii.product_id = p.id
+     WHERE gi.order_id = ? 
+       AND gi.status IN ('CREATED', 'COMPLETED')
+     ORDER BY gi.id ASC, gii.id ASC`,
     [orderId]
   );
 
@@ -115,6 +181,7 @@ exports.getByOrderId = async (orderId) => {
     if (!giMap[row.id]) {
       giMap[row.id] = {
         id: row.id,
+        issue_code: row.issue_code,
         order_id: row.order_id,
         store_from: row.store_from,
         store_to: row.store_to,
@@ -126,8 +193,10 @@ exports.getByOrderId = async (orderId) => {
     
     if (row.product_id) {
       giMap[row.id].items.push({
+        item_id: row.item_id,
         product_id: row.product_id,
-        name: row.name,
+        product_name: row.product_name,
+        sku: row.sku,
         quantity: row.quantity
       });
     }
@@ -136,6 +205,9 @@ exports.getByOrderId = async (orderId) => {
   return Object.values(giMap);
 };
 
+/**
+ * ✅ Generate Goods Receipt from Goods Issue
+ */
 exports.generateReceipt = async (issueId) => {
   const issue = await exports.getById(issueId);
   if (!issue) throw new Error("issue not found");
@@ -145,9 +217,14 @@ exports.generateReceipt = async (issueId) => {
     orderId: issue.order_id,
     storeId: issue.store_to,
     createdBy: issue.created_by,
-    items: issue.items
+    items: issue.items.map(item => ({
+      product_id: item.product_id,
+      quantity: item.quantity
+    }))
   };
   
   const receiptId = await goodsReceiptModel.createFromIssue(receiptData);
   return receiptId;
 };
+
+module.exports = exports;

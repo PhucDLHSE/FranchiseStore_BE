@@ -89,71 +89,79 @@ exports.create = async (req, res) => {
           giItems[item.product_id] = item.quantity;
         }
 
-        // 5. ✅ NEW: Get all existing GI for this order (to check total)
+        // 5. ✅ Get all existing GI for this order (to check total)
         console.log(`[GI Create] Checking existing GI for order ${order_id}`);
-        const existingGI = await giModel.getByOrderId(order_id);
         
-        // Calculate total GI quantity per product
-        const totalGIByProduct = {};
-        if (existingGI && existingGI.length > 0) {
-          for (const gi of existingGI) {
-            if (gi.items) {
-              for (const item of gi.items) {
-                if (!totalGIByProduct[item.product_id]) {
-                  totalGIByProduct[item.product_id] = 0;
+        try {
+          const existingGI = await giModel.getByOrderId(order_id);
+          
+          // Calculate total GI quantity per product
+          const totalGIByProduct = {};
+          if (existingGI && existingGI.length > 0) {
+            for (const gi of existingGI) {
+              if (gi.items) {
+                for (const item of gi.items) {
+                  if (!totalGIByProduct[item.product_id]) {
+                    totalGIByProduct[item.product_id] = 0;
+                  }
+                  totalGIByProduct[item.product_id] += item.quantity;
                 }
-                totalGIByProduct[item.product_id] += item.quantity;
               }
             }
           }
-        }
 
-        console.log(`[GI Create] Existing GI quantities per product:`, totalGIByProduct);
+          console.log(`[GI Create] Existing GI quantities per product:`, totalGIByProduct);
 
-        // 6. ✅ Validate new GI quantity doesn't exceed order quantity
-        for (const productId in giItems) {
-          const newGIQty = giItems[productId];
-          const orderQty = orderItems[productId].quantity;
-          const existingGIQty = totalGIByProduct[productId] || 0;
-          const totalWillBe = existingGIQty + newGIQty;
-          const productName = orderItems[productId].product_name;
+          // 6. ✅ Validate new GI quantity doesn't exceed order quantity
+          for (const productId in giItems) {
+            const newGIQty = giItems[productId];
+            const orderQty = orderItems[productId].quantity;
+            const existingGIQty = totalGIByProduct[productId] || 0;
+            const totalWillBe = existingGIQty + newGIQty;
+            const productName = orderItems[productId].product_name;
 
-          console.log(
-            `[GI Create] Product ${productName} (${productId}): ` +
-            `order=${orderQty}, ` +
-            `existing_gi=${existingGIQty}, ` +
-            `new_gi=${newGIQty}, ` +
-            `total_will_be=${totalWillBe}`
+            console.log(
+              `[GI Create] Product ${productName} (${productId}): ` +
+              `order=${orderQty}, ` +
+              `existing_gi=${existingGIQty}, ` +
+              `new_gi=${newGIQty}, ` +
+              `total_will_be=${totalWillBe}`
+            );
+
+            // Check new GI quantity
+            if (newGIQty > orderQty) {
+              return response.error(
+                res,
+                { code: 400, message: "Quantity exceeds order" },
+                `${productName} (ID: ${productId}): GI quantity (${newGIQty}) exceeds order quantity (${orderQty})`
+              );
+            }
+
+            // ✅ Check total GI quantity across all GI doesn't exceed order
+            if (totalWillBe > orderQty) {
+              return response.error(
+                res,
+                { code: 400, message: "Total GI quantity exceeds order" },
+                `${productName} (ID: ${productId}): Total GI quantity (${existingGIQty} + ${newGIQty} = ${totalWillBe}) exceeds order quantity (${orderQty}). ` +
+                `Remaining available: ${orderQty - existingGIQty}`
+              );
+            }
+          }
+
+          console.log(`[GI Create] ✅ Order items validation passed`);
+          
+        } catch (giErr) {
+          console.error("[GI Create] Error checking existing GI:", giErr);
+          return response.error(
+            res,
+            ERROR.INTERNAL_ERROR,
+            `Error checking existing goods issues: ${giErr.message}`
           );
-
-          // Check new GI quantity
-          if (newGIQty > orderQty) {
-            return response.error(
-              res,
-              { code: 400, message: "Quantity exceeds order" },
-              `${productName} (ID: ${productId}): GI quantity (${newGIQty}) exceeds order quantity (${orderQty})`
-            );
-          }
-
-          // ✅ Check total GI quantity across all GI doesn't exceed order
-          if (totalWillBe > orderQty) {
-            return response.error(
-              res,
-              { code: 400, message: "Total GI quantity exceeds order" },
-              `${productName} (ID: ${productId}): Total GI quantity (${existingGIQty} + ${newGIQty} = ${totalWillBe}) exceeds order quantity (${orderQty}). ` +
-              `Remaining available: ${orderQty - existingGIQty}`
-            );
-          }
         }
-
-        console.log(`[GI Create] ✅ Order items validation passed`);
 
       } catch (orderErr) {
         console.error("[GI Create] Error validating order:", orderErr);
-        if (orderErr.response) {
-          return orderErr.response;
-        }
-        return response.error(res, ERROR.INTERNAL_ERROR, "Error validating order");
+        return response.error(res, ERROR.INTERNAL_ERROR, `Error validating order: ${orderErr.message}`);
       }
     }
 
@@ -198,7 +206,8 @@ exports.create = async (req, res) => {
     return response.success(res, issue, "Goods issue created");
   } catch (err) {
     console.error("[GI Create] Error:", err);
-    return response.error(res, ERROR.INTERNAL_ERROR);
+    console.error("[GI Create] Stack:", err.stack);
+    return response.error(res, ERROR.INTERNAL_ERROR, err.message);
   }
 };
 
@@ -224,25 +233,25 @@ exports.complete = async (req, res) => {
       return response.error(res, { code: 400, message: "Already completed" }, "Already completed");
     }
 
-    // Lấy lại issue mới nhất
+    // Get updated issue
     issue = await giModel.getById(issueId);
 
-    // 1. trừ tồn kho kho phát
+    // 1. Deduct inventory from issuing store
     for (const it of issue.items) {
       await inventoryModel.decreaseStock(issue.store_from, it.product_id, it.quantity);
     }
 
-    // 2. tạo GoodsReceipt
+    // 2. Generate GoodsReceipt
     const receiptId = await giModel.generateReceipt(issueId);
     let receipt = null;
     try {
       receipt = await goodsReceiptModel.getById(receiptId);
     } catch (err) {
-      console.error("Error fetching receipt:", err);
+      console.error("[GI Complete] Error fetching receipt:", err);
       receipt = { id: receiptId, receipt_code: "GR-" + Date.now() };
     }
 
-    // 3. ✅ Nếu có order_id và đây là lần đầu issue, thì update status CONFIRMED -> ISSUED
+    // 3. ✅ If order exists and this is first issue, update order status CONFIRMED -> ISSUED
     if (issue.order_id) {
       try {
         console.log(`[GI Complete] Checking order status for order ${issue.order_id}`);
@@ -271,19 +280,49 @@ exports.complete = async (req, res) => {
 
     return response.success(res, updated, "Goods issue completed");
   } catch (err) {
-    console.error("Error in complete goods issue:", err);
-    console.error("Stack:", err.stack);
-    return response.error(res, ERROR.INTERNAL_ERROR);
+    console.error("[GI Complete] Error:", err);
+    console.error("[GI Complete] Stack:", err.stack);
+    return response.error(res, ERROR.INTERNAL_ERROR, err.message);
   }
 };
 
+/**
+ * ✅ Get Goods Issue by ID
+ */
+exports.getOne = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = req.user;
+
+    const issue = await giModel.getById(id);
+    if (!issue) {
+      return response.error(res, ERROR.NOT_FOUND, "Goods issue not found");
+    }
+
+    // Access control
+    if (issue.store_from !== user.store_id && user.role !== "ADMIN") {
+      return response.error(res, ERROR.FORBIDDEN, "You don't have permission to view this issue");
+    }
+
+    return response.success(res, issue);
+  } catch (err) {
+    console.error("[GI GetOne] Error:", err);
+    return response.error(res, ERROR.INTERNAL_ERROR, err.message);
+  }
+};
+
+/**
+ * ✅ List Goods Issues
+ */
 exports.list = async (req, res) => {
   try {
     const storeId = req.user.store_id;
     const rows = await giModel.listByStore(storeId);
-    return response.success(res, rows);
+    return response.success(res, rows, `Retrieved ${rows.length} goods issues`);
   } catch (err) {
-    console.error(err);
-    return response.error(res, ERROR.INTERNAL_ERROR);
+    console.error("[GI List] Error:", err);
+    return response.error(res, ERROR.INTERNAL_ERROR, err.message);
   }
 };
+
+module.exports = exports;
