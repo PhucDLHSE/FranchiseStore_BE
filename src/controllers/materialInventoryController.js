@@ -105,7 +105,7 @@ exports.getByMaterialId = async (req, res) => {
           material_name: inventory.material_name,
           material_sku: inventory.material_sku,
           unit: inventory.unit,
-          total_quantity: Number(inventory.quantity).toFixed(3),  // ✅ From MaterialInventory
+          total_quantity: Number(inventory.quantity).toFixed(3), 
           batch_count: 0,
           batches: []
         },

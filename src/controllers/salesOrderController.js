@@ -1,3 +1,4 @@
+const pool = require('../configs/database');
 const salesOrderModel = require('../models/salesOrderModel');
 const storePricingModel = require('../models/storePricingModel');
 const productModel = require('../models/productModel');
@@ -15,8 +16,6 @@ exports.create = async (req, res) => {
     const {
       customerName,
       customerPhone,
-      deliveryDate,
-      deliveryAddress,
       items,
       paymentMethod = 'CASH',
       notes
@@ -24,30 +23,10 @@ exports.create = async (req, res) => {
     const user = req.user;
 
     console.log(
-      `[SalesOrder Create] ${user.role} ${user.id} creating sales order for customer: ${customerName}`
+      `[SalesOrder Create] ${user.role} ${user.id} creating sales order for customer: ${customerName || 'Khách lẻ'}`
     );
 
     // ==================== VALIDATION ====================
-    if (!customerName) {
-      return response.error(res, ERROR.BAD_REQUEST, "customerName is required");
-    }
-
-    if (!deliveryDate) {
-      return response.error(res, ERROR.BAD_REQUEST, "deliveryDate is required");
-    }
-
-    const deliveryDateObj = new Date(deliveryDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (deliveryDateObj < today) {
-      return response.error(
-        res,
-        ERROR.BAD_REQUEST,
-        "deliveryDate cannot be in the past"
-      );
-    }
-
     if (!items || items.length === 0) {
       return response.error(
         res,
@@ -143,8 +122,6 @@ exports.create = async (req, res) => {
       storeId,
       customerName,
       customerPhone,
-      deliveryDate,
-      deliveryAddress,
       items: validatedItems,
       paymentMethod,
       notes,
@@ -153,48 +130,67 @@ exports.create = async (req, res) => {
 
     console.log(`[SalesOrder Create] ✅ Sales order created: ID=${salesOrderId}`);
 
-    // ==================== GET FULL ORDER ====================
+    // ==================== AUTO COMPLETE ORDER ====================
+    // Automatically complete the order and process payment
+    console.log(`[SalesOrder Create] Auto-completing order...`);
+    const completeSuccess = await salesOrderModel.complete(salesOrderId, user.id);
+
+    if (!completeSuccess) {
+      console.error(`[SalesOrder Create] ❌ Failed to auto-complete order ${salesOrderId}`);
+      return response.error(res, ERROR.INTERNAL_ERROR, "Order created but failed to complete");
+    }
+
+    console.log(`[SalesOrder Create] ✅ Order auto-completed, payment recorded, inventory deducted`);
+
+    // ==================== GET BILL/RECEIPT ====================
     const rows = await salesOrderModel.getById(salesOrderId);
 
     if (!rows || rows.length === 0) {
-      return response.error(res, ERROR.INTERNAL_ERROR, "Failed to retrieve order");
+      return response.error(res, ERROR.INTERNAL_ERROR, "Failed to retrieve bill");
     }
 
-    const orderInfo = {
+    // ==================== BUILD BILL/RECEIPT FORMAT ====================
+    const bill = {
       id: rows[0].id,
       sales_order_code: rows[0].sales_order_code,
       store_id: rows[0].store_id,
       customer_name: rows[0].customer_name,
       customer_phone: rows[0].customer_phone,
-      delivery_date: rows[0].delivery_date,
-      delivery_address: rows[0].delivery_address,
       status: rows[0].status,
-      total_amount: rows[0].total_amount,
       payment_method: rows[0].payment_method,
-      payment_status: rows[0].payment_status,
       created_at: rows[0].created_at,
-      items: []
+      
+      // ========== BILL ITEMS ==========
+      items: [],
+      subtotal: 0,
+      total_amount: parseFloat(rows[0].total_amount),
+      paid_amount: parseFloat(rows[0].paid_amount),
+      payment_status: rows[0].payment_status,
+      
+      // ========== BILL STATE ==========
+      bill_status: 'COMPLETED'
     };
 
+    // Calculate subtotal and build items list
     rows.forEach(row => {
       if (row.item_id) {
-        orderInfo.items.push({
-          item_id: row.item_id,
-          product_id: row.product_id,
+        const itemTotal = parseFloat(row.total_price);
+        bill.items.push({
           product_name: row.product_name,
           product_sku: row.sku,
           quantity: row.quantity,
-          sale_price: row.sale_price,
-          total_price: row.total_price
+          unit_price: parseFloat(row.sale_price),
+          total_price: itemTotal
         });
+        bill.subtotal += itemTotal;
       }
     });
 
     console.log(
-      `[SalesOrder Create] ✅ Sales order created with ${orderInfo.items.length} items, total: ${orderInfo.total_amount}`
+      `[SalesOrder Create] ✅ 🧾 Bill prepared: ${bill.sales_order_code} | Total: ${bill.total_amount} | Payment: ${bill.payment_status}`
     );
 
-    return response.success(res, orderInfo, "Sales order created successfully", 201);
+    return response.success(res, bill, "🧾 Bill - Order complete with payment processed", 201);
 
   } catch (error) {
     console.error("[SalesOrder Create] Error:", error);
@@ -288,100 +284,78 @@ exports.getAll = async (req, res) => {
 };
 
 /**
- * Confirm Sales Order
- * PATCH /api/sales-orders/:id/confirm
+ * Complete Sales Order & Deduct Inventory
+ * PATCH /api/sales-orders/:id/complete
+ * CREATED -> COMPLETE
  */
-exports.confirm = async (req, res) => {
+exports.complete = async (req, res) => {
   try {
     const { id } = req.params;
     const user = req.user;
 
-    console.log(`[SalesOrder Confirm] ${user.role} ${user.id} confirming order ${id}`);
+    console.log(`[SalesOrder Complete] ${user.role} ${user.id} completing order ${id}`);
 
-    const success = await salesOrderModel.confirm(id, user.id);
+    const success = await salesOrderModel.complete(id, user.id);
 
     if (!success) {
       return response.error(
         res,
         ERROR.BAD_REQUEST,
-        "Order cannot be confirmed (not found or invalid status)"
+        "Order cannot be completed (not found or invalid status)"
       );
     }
 
     const rows = await salesOrderModel.getById(id);
-    const orderInfo = rows[0];
 
-    console.log(`[SalesOrder Confirm] ✅ Order confirmed`);
-
-    return response.success(res, orderInfo, "Order confirmed successfully");
-
-  } catch (error) {
-    console.error("[SalesOrder Confirm] Error:", error);
-    return response.error(res, ERROR.INTERNAL_ERROR);
-  }
-};
-
-/**
- * Pack Sales Order
- * PATCH /api/sales-orders/:id/pack
- */
-exports.pack = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const user = req.user;
-
-    console.log(`[SalesOrder Pack] ${user.role} ${user.id} packing order ${id}`);
-
-    const success = await salesOrderModel.pack(id, user.id);
-
-    if (!success) {
-      return response.error(
-        res,
-        ERROR.BAD_REQUEST,
-        "Order cannot be packed (not found or invalid status)"
-      );
+    if (!rows || rows.length === 0) {
+      return response.error(res, ERROR.INTERNAL_ERROR, "Failed to retrieve completed order");
     }
 
-    console.log(`[SalesOrder Pack] ✅ Order packed`);
+    // ==================== BUILD BILL/RECEIPT ====================
+    const bill = {
+      id: rows[0].id,
+      sales_order_code: rows[0].sales_order_code,
+      store_id: rows[0].store_id,
+      customer_name: rows[0].customer_name,
+      customer_phone: rows[0].customer_phone,
+      status: rows[0].status,
+      payment_method: rows[0].payment_method,
+      created_at: rows[0].created_at,
+      
+      // ========== BILL DETAILS ==========
+      items: [],
+      subtotal: 0,
+      total_amount: parseFloat(rows[0].total_amount),
+      paid_amount: parseFloat(rows[0].paid_amount),
+      payment_status: rows[0].payment_status,
+      
+      // ========== BILL STATE ==========
+      bill_status: 'COMPLETED'
+    };
 
-    return response.success(res, { status: 'PACKED' }, "Order packed successfully");
+    // Calculate subtotal from items
+    rows.forEach(row => {
+      if (row.item_id) {
+        const itemTotal = parseFloat(row.total_price);
+        bill.items.push({
+          product_name: row.product_name,
+          product_sku: row.sku,
+          quantity: row.quantity,
+          unit_price: parseFloat(row.sale_price),
+          total_price: itemTotal
+        });
+        bill.subtotal += itemTotal;
+      }
+    });
+
+    console.log(
+      `[SalesOrder Complete] ✅ Bill generated: ${bill.sales_order_code} | Amount: ${bill.total_amount} | Status: ${bill.payment_status}`
+    );
+
+    return response.success(res, bill, "🧾 Bill completed - Payment accepted", 200);
 
   } catch (error) {
-    console.error("[SalesOrder Pack] Error:", error);
-    return response.error(res, ERROR.INTERNAL_ERROR);
-  }
-};
-
-/**
- * Deliver Sales Order & Deduct Inventory
- * PATCH /api/sales-orders/:id/deliver
- */
-exports.deliver = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const user = req.user;
-
-    console.log(`[SalesOrder Deliver] ${user.role} ${user.id} delivering order ${id}`);
-
-    const success = await salesOrderModel.deliver(id, user.id);
-
-    if (!success) {
-      return response.error(
-        res,
-        ERROR.BAD_REQUEST,
-        "Order cannot be delivered (not found or invalid status)"
-      );
-    }
-
-    const rows = await salesOrderModel.getById(id);
-    const orderInfo = rows[0];
-
-    console.log(`[SalesOrder Deliver] ✅ Order delivered & inventory updated`);
-
-    return response.success(res, orderInfo, "Order delivered successfully");
-
-  } catch (error) {
-    console.error("[SalesOrder Deliver] Error:", error);
+    console.error("[SalesOrder Complete] Error:", error);
     return response.error(res, ERROR.INTERNAL_ERROR, error.message);
   }
 };
@@ -420,30 +394,217 @@ exports.cancel = async (req, res) => {
 /**
  * Record Payment
  * PATCH /api/sales-orders/:id/payment
+ * Status: PAID (if fully paid) / UNPAID (if not fully paid)
+ * No PARTIAL status
  */
 exports.recordPayment = async (req, res) => {
   try {
     const { id } = req.params;
-    const { paidAmount } = req.body;
+    const { payment_amount } = req.body;
     const user = req.user;
 
-    if (!paidAmount || paidAmount <= 0) {
-      return response.error(res, ERROR.BAD_REQUEST, "paidAmount must be > 0");
+    if (!payment_amount || payment_amount <= 0) {
+      return response.error(res, ERROR.BAD_REQUEST, "payment_amount must be > 0");
     }
 
-    console.log(`[SalesOrder Payment] ${user.role} recording payment: ${paidAmount}`);
+    console.log(`[SalesOrder Payment] ${user.role} recording payment: ${payment_amount}`);
 
-    const success = await salesOrderModel.recordPayment(id, paidAmount);
+    // ✅ Get order before update
+    const [orderBefore] = await pool.query(
+      `SELECT id, total_amount, paid_amount, payment_status FROM SalesOrder WHERE id = ?`,
+      [id]
+    );
+
+    if (orderBefore.length === 0) {
+      return response.error(res, ERROR.NOT_FOUND, "Order not found");
+    }
+
+    const order = orderBefore[0];
+    // ✅ Convert to number - fix string concatenation bug
+    const totalAmount = parseFloat(order.total_amount);
+    const currentPaidAmount = parseFloat(order.paid_amount || 0);
+    const paymentAmt = parseFloat(payment_amount);
+    const newPaidAmount = currentPaidAmount + paymentAmt;
+    const newPaymentStatus = newPaidAmount >= totalAmount ? 'PAID' : 'UNPAID';
+    const remainingAmount = Math.max(0, totalAmount - newPaidAmount);
+
+    // ✅ Update payment
+    const success = await salesOrderModel.recordPayment(id, payment_amount);
 
     if (!success) {
       return response.error(res, ERROR.BAD_REQUEST, "Failed to record payment");
     }
 
-    return response.success(res, { status: 'PAID' }, "Payment recorded successfully");
+    console.log(
+      `[SalesOrder Payment] ✅ Payment recorded: ${paymentAmt} | Total Paid: ${newPaidAmount}/${totalAmount} | Status: ${newPaymentStatus}`
+    );
+
+    // ✅ Round to 2 decimals and return as numbers
+    const result = {
+      order_id: parseInt(id),
+      payment_amount: parseFloat(paymentAmt.toFixed(2)),
+      total_amount: parseFloat(totalAmount.toFixed(2)),
+      total_paid: parseFloat(newPaidAmount.toFixed(2)),
+      remaining_amount: parseFloat(remainingAmount.toFixed(2)),
+      payment_status: newPaymentStatus,
+      is_fully_paid: newPaymentStatus === 'PAID'
+    };
+
+    return response.success(res, result, `Payment recorded successfully | Status: ${newPaymentStatus}`);
 
   } catch (error) {
     console.error("[SalesOrder Payment] Error:", error);
-    return response.error(res, ERROR.INTERNAL_ERROR);
+    return response.error(res, ERROR.INTERNAL_ERROR, error.message);
+  }
+};
+
+/**
+ * ✅ Get Revenue Summary
+ * GET /api/sales-orders/revenue/summary
+ * Query: date, fromDate, toDate, payment_status
+ */
+exports.getRevenueSummary = async (req, res) => {
+  try {
+    const { date, fromDate, toDate, payment_status } = req.query;
+    const user = req.user;
+    const storeId = user.store_id;
+
+    console.log(
+      `[SalesOrder Revenue Summary] Store ${storeId} fetching revenue summary`
+    );
+
+    const summary = await salesOrderModel.getRevenueSummary(storeId, {
+      date,
+      fromDate,
+      toDate,
+      payment_status
+    });
+
+    console.log(
+      `[SalesOrder Revenue Summary] ✅ Revenue summary: ${JSON.stringify(summary)}`
+    );
+
+    return response.success(
+      res,
+      summary,
+      "Revenue summary retrieved successfully"
+    );
+
+  } catch (error) {
+    console.error("[SalesOrder Revenue Summary] Error:", error);
+    return response.error(res, ERROR.INTERNAL_ERROR, error.message);
+  }
+};
+
+/**
+ * ✅ Get Revenue by Day
+ * GET /api/sales-orders/revenue/daily
+ * Query: fromDate, toDate, groupBy (day/week/month)
+ */
+exports.getRevenueByDay = async (req, res) => {
+  try {
+    const { fromDate, toDate, groupBy = 'day' } = req.query;
+    const user = req.user;
+    const storeId = user.store_id;
+
+    console.log(
+      `[SalesOrder Revenue Daily] Store ${storeId} fetching daily revenue`
+    );
+
+    const dailyRevenue = await salesOrderModel.getRevenueByDay(storeId, {
+      fromDate,
+      toDate,
+      groupBy
+    });
+
+    console.log(
+      `[SalesOrder Revenue Daily] ✅ Found ${dailyRevenue.length} day(s) data`
+    );
+
+    return response.success(
+      res,
+      dailyRevenue,
+      "Daily revenue retrieved successfully"
+    );
+
+  } catch (error) {
+    console.error("[SalesOrder Revenue Daily] Error:", error);
+    return response.error(res, ERROR.INTERNAL_ERROR, error.message);
+  }
+};
+
+/**
+ * ✅ Get Revenue by Product
+ * GET /api/sales-orders/revenue/product
+ * Query: fromDate, toDate, product_id, sort_by (quantity/revenue)
+ */
+exports.getRevenueByProduct = async (req, res) => {
+  try {
+    const { fromDate, toDate, product_id, sort_by = 'revenue' } = req.query;
+    const user = req.user;
+    const storeId = user.store_id;
+
+    console.log(
+      `[SalesOrder Revenue Product] Store ${storeId} fetching product revenue`
+    );
+
+    const productRevenue = await salesOrderModel.getRevenueByProduct(storeId, {
+      fromDate,
+      toDate,
+      product_id,
+      sort_by
+    });
+
+    console.log(
+      `[SalesOrder Revenue Product] ✅ Found ${productRevenue.length} product(s)`
+    );
+
+    return response.success(
+      res,
+      productRevenue,
+      "Product revenue retrieved successfully"
+    );
+
+  } catch (error) {
+    console.error("[SalesOrder Revenue Product] Error:", error);
+    return response.error(res, ERROR.INTERNAL_ERROR, error.message);
+  }
+};
+
+/**
+ * ✅ Get Revenue Range/Trend
+ * GET /api/sales-orders/revenue/range
+ * Query: fromDate, toDate, interval (day/week/month)
+ */
+exports.getRevenueRange = async (req, res) => {
+  try {
+    const { fromDate, toDate, interval = 'day' } = req.query;
+    const user = req.user;
+    const storeId = user.store_id;
+
+    console.log(
+      `[SalesOrder Revenue Range] Store ${storeId} fetching revenue range`
+    );
+
+    const revenueTrend = await salesOrderModel.getRevenueRange(storeId, {
+      fromDate,
+      toDate,
+      interval
+    });
+
+    console.log(
+      `[SalesOrder Revenue Range] ✅ Retrieved ${revenueTrend.length} data points`
+    );
+
+    return response.success(
+      res,
+      revenueTrend,
+      "Revenue trend retrieved successfully"
+    );
+
+  } catch (error) {
+    console.error("[SalesOrder Revenue Range] Error:", error);
+    return response.error(res, ERROR.INTERNAL_ERROR, error.message);
   }
 };
 

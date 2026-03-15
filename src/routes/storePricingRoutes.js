@@ -45,7 +45,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
 router.patch(
   "/store-pricing/:productId/set-sale-price",
   verifyToken,
-  requireRoles(["FR_STAFF", "MANAGER"]),
+  requireRoles(["MANAGER"]),
   storePricingController.setSalePrice
 );
 

@@ -230,6 +230,7 @@ exports.getStoreProductsWithPricing = async (storeId, filters = {}) => {
 
 /**
  * ✅ Get products without pricing yet (not available for sale)
+ * Only returns products that exist in the store's inventory (INNER JOIN)
  */
 exports.getProductsWithoutPricing = async (storeId, filters = {}) => {
   const { keyword, category_id } = filters;
@@ -248,9 +249,10 @@ exports.getProductsWithoutPricing = async (storeId, filters = {}) => {
       i.quantity AS stock_quantity
     FROM Product p
     LEFT JOIN Category c ON p.category_id = c.id
-    LEFT JOIN Inventory i ON p.id = i.product_id AND i.store_id = ?
+    INNER JOIN Inventory i ON p.id = i.product_id AND i.store_id = ?
     WHERE p.is_active = TRUE
       AND p.deleted_at IS NULL
+      AND i.quantity > 0
       AND NOT EXISTS (
         SELECT 1 FROM StorePricing sp 
         WHERE sp.product_id = p.id 
