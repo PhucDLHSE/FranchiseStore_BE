@@ -20,7 +20,6 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *     operationId: createAndCheckoutOrder
  *     description: 
  *       FR_STAFF/MANAGER creates order and immediately completes checkout. No separate payment/completion steps!
- *       
  *       **Automatic Process:**
  *       1. ✅ Validate items (product exists, has pricing, has sufficient inventory)
  *       2. ✅ Create SalesOrder (status=CREATED)
