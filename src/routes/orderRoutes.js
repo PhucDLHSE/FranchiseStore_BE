@@ -10,7 +10,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  * @swagger
  * tags:
  *   name: Orders
- *   description: Order Management (FR_STAFF, CK_STAFF, MANAGER)
+ *   description: Order Management (FR_STAFF, CK_STAFF, MANAGER) - Status Flow: SUBMITTED → CONFIRMED → ISSUED → DELIVERED / REJECTED / CANCELLED
  */
 
 /**
@@ -117,7 +117,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *                       example: "2026-03-15"
  *                     status:
  *                       type: string
- *                       enum: [SUBMITTED, CONFIRMED, ISSUED, DELIVERED, CANCELLED]
+                       enum: [SUBMITTED, CONFIRMED, ISSUED, DELIVERED, CANCELLED, REJECTED]
  *                       example: SUBMITTED
  *                     total_amount:
  *                       type: number
@@ -210,8 +210,7 @@ router.post(
  *       - SUBMITTED: Order created by FR_STAFF
  *       - CONFIRMED: CK_STAFF confirmed the order
  *       - ISSUED: First Goods Issue completed (can have multiple Issues for partial delivery)
- *       - DELIVERED: All ordered items received (delivered_quantity >= total_quantity)
- *       - CANCELLED: Order cancelled by FR_STAFF/MANAGER
+ *       - DELIVERED: All ordered items received (delivered_quantity >= total_quantity)       - REJECTED: CK_STAFF rejected the order (returns to FR_STAFF) *       - CANCELLED: Order cancelled by FR_STAFF/MANAGER
  *     tags: [Orders]
  *     security:
  *       - bearerAuth: []
@@ -220,7 +219,7 @@ router.post(
  *         name: status
  *         schema:
  *           type: string
- *           enum: [SUBMITTED, CONFIRMED, ISSUED, DELIVERED, CANCELLED]
+ *           enum: [SUBMITTED, CONFIRMED, ISSUED, DELIVERED, CANCELLED, REJECTED]
  *         description: Filter by order status
  *       - in: query
  *         name: store_id
@@ -260,7 +259,7 @@ router.post(
  *                         format: date
  *                       status:
  *                         type: string
- *                         enum: [SUBMITTED, CONFIRMED, ISSUED, DELIVERED, CANCELLED]
+ *                         enum: [SUBMITTED, CONFIRMED, ISSUED, DELIVERED, CANCELLED, REJECTED]
  *                       delivered_quantity:
  *                         type: integer
  *                         description: Items already received
@@ -346,7 +345,7 @@ router.get(
  *                   example: "2026-03-06"
  *                 status:
  *                   type: string
- *                   enum: [SUBMITTED, CONFIRMED, ISSUED, DELIVERED, CANCELLED]
+ *                   enum: [SUBMITTED, CONFIRMED, ISSUED, DELIVERED, CANCELLED, REJECTED]
  *                   example: ISSUED
  *                 delivered_quantity:
  *                   type: integer
@@ -626,6 +625,166 @@ router.patch(
   verifyToken,
   requireRoles(["FR_STAFF", "MANAGER"]),
   orderController.cancelOrder
+);
+
+/**
+ * @swagger
+ * /orders/{id}/reject:
+ *   patch:
+ *     summary: Reject an order (CK_STAFF only)
+ *     description: |
+ *       **CK_STAFF rejects an order after review.**
+ *       
+ *       **Restrictions:**
+ *       - Only orders in CONFIRMED status can be rejected
+ *       - Cannot reject SUBMITTED, ISSUED, DELIVERED, or CANCELLED orders
+ *       - Only CK_STAFF can reject orders
+ *       
+ *       **Transition:** CONFIRMED → REJECTED
+ *       
+ *       **Use Cases:**
+ *       - CK_STAFF checks confirmed order against actual inventory
+ *       - Discover insufficient stock
+ *       - Discover product quality issues
+ *       - Discover invalid product specifications
+ *       - Send back to FR_STAFF for revision or modification
+ *       
+ *       **Cannot Reject If:**
+ *       ```
+ *        Order status is SUBMITTED (Not yet confirmed by CK_STAFF)
+ *        Order status is ISSUED (Goods already shipped)
+ *        Order status is DELIVERED (Already received)
+ *        Order status is CANCELLED (Already cancelled)
+ *        Order status is REJECTED (Already rejected)
+ *       ```
+ *       
+ *       **Workflow Example:**
+ *       ```
+ *       Order #1: CONFIRMED (CK_STAFF confirmed)
+ *       ├─ CK_STAFF reviews actual inventory
+ *       ├─ Discover insufficient quantity
+ *       ├─ Reject Order → CONFIRMED → REJECTED
+ *       └─ Notify FR_STAFF to modify and resubmit
+ *       ```
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Order ID to reject
+ *         example: 1
+ *       - in: query
+ *         name: reason
+ *         schema:
+ *           type: string
+ *           description: Rejection reason (optional, for audit trail)
+ *           example: "Insufficient inventory"
+ *     responses:
+ *       200:
+ *         description: Order rejected successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 1
+ *                     order_code:
+ *                       type: string
+ *                       example: "ORD-1740244800000"
+ *                     store_id:
+ *                       type: integer
+ *                       example: 2
+ *                     status:
+ *                       type: string
+ *                       enum: [SUBMITTED, CONFIRMED, ISSUED, DELIVERED, CANCELLED, REJECTED]
+ *                       example: "REJECTED"
+ *                     created_by:
+ *                       type: integer
+ *                       description: FR_STAFF user ID who created
+ *                       example: 10
+ *                     confirmed_by:
+ *                       type: integer
+ *                       nullable: true
+ *                     rejected_by:
+ *                       type: integer
+ *                       description: CK_STAFF user ID who rejected
+ *                       nullable: true
+ *                     created_at:
+ *                       type: string
+ *                       format: date-time
+ *                     updated_at:
+ *                       type: string
+ *                       format: date-time
+ *                     items:
+ *                       type: array
+ *                       description: List of items in the order
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           order_item_id:
+ *                             type: integer
+ *                             example: 1
+ *                           product_id:
+ *                             type: integer
+ *                             example: 2
+ *                           product_name:
+ *                             type: string
+ *                             example: "Bánh mỳ thơm"
+ *                           quantity:
+ *                             type: integer
+ *                             example: 100
+ *                           unit_price:
+ *                             type: number
+ *                             format: float
+ *                             example: 20000
+ *                           total_price:
+ *                             type: number
+ *                             format: float
+ *                             example: 2000000
+ *                 message:
+ *                   type: string
+ *                   example: "Order rejected successfully"
+ *       400:
+ *         description: Cannot reject order (wrong status)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error_code:
+ *                   type: integer
+ *                   example: 400
+ *                 message:
+ *                   type: string
+ *                   examples:
+ *                     - "Order can only be rejected in CONFIRMED status. Current status: SUBMITTED"
+ *                     - "Order can only be rejected in CONFIRMED status. Current status: ISSUED"
+ *       401:
+ *         description: Unauthorized - Missing or invalid token
+ *       403:
+ *         description: Forbidden - Only CK_STAFF can reject
+ *       404:
+ *         description: Order not found
+ *       500:
+ *         description: Internal server error
+ */
+router.patch(
+  "/orders/:id/reject",
+  verifyToken,
+  requireCKStaff,
+  orderController.rejectOrder
 );
 
 module.exports = router;

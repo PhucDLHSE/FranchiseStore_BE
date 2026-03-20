@@ -113,6 +113,8 @@ exports.getOrderById = async (orderId) => {
         o.confirmed_by,
         o.issued_by,
         o.received_by,
+        o.cancelled_by,
+        o.rejected_by,
         o.created_at,
         o.updated_at,
 
@@ -313,6 +315,23 @@ exports.getOrderStatus = async (orderId) => {
   );
   
   return rows.length > 0 ? rows[0] : null;
+};
+
+/**
+ * Reject Order (only CONFIRMED)
+ * CK_STAFF rejects order: CONFIRMED → REJECTED
+ */
+exports.rejectOrder = async (orderId, rejectedBy) => {
+  const [result] = await pool.query(
+    `UPDATE Orders 
+     SET status = 'REJECTED', 
+         updated_at = NOW(), 
+         rejected_by = ?
+     WHERE id = ? AND status = 'CONFIRMED'`,
+    [rejectedBy, orderId]
+  );
+  
+  return result.affectedRows > 0;
 };
 
 /**

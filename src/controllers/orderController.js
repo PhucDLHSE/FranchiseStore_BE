@@ -510,10 +510,118 @@ exports.cancelOrder = async (req, res) => {
 
     // 5️⃣ Get updated order
     const updatedOrder = await orderModel.getOrderById(orderId);
-    return response.success(res, updatedOrder[0], "Order cancelled successfully");
+    
+    const orderInfo = {
+      id: updatedOrder[0].id,
+      order_code: updatedOrder[0].order_code,
+      store_id: updatedOrder[0].store_id,
+      order_date: updatedOrder[0].order_date,
+      delivery_date: updatedOrder[0].delivery_date,
+      status: updatedOrder[0].status,
+      total_amount: updatedOrder[0].total_amount,
+      created_by: updatedOrder[0].created_by,
+      confirmed_by: updatedOrder[0].confirmed_by,
+      cancelled_by: updatedOrder[0].cancelled_by,
+      created_at: updatedOrder[0].created_at,
+      updated_at: updatedOrder[0].updated_at,
+      items: []
+    };
+
+    updatedOrder.forEach(row => {
+      if (row.order_item_id) {
+        orderInfo.items.push({
+          order_item_id: row.order_item_id,
+          product_id: row.product_id,
+          product_name: row.product_name,
+          quantity: row.quantity,
+          unit_price: row.unit_price,
+          total_price: row.total_price
+        });
+      }
+    });
+
+    return response.success(res, orderInfo, "Order cancelled successfully");
 
   } catch (err) {
     console.error("[Order Cancel] Error:", err);
+    return response.error(res, ERROR.INTERNAL_ERROR, err.message);
+  }
+};
+
+/**
+ * Reject an order
+ * Only CONFIRMED orders can be rejected
+ * Only CK_STAFF can reject
+ */
+exports.rejectOrder = async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const user = req.user;
+
+    console.log(`[Order Reject] CK_STAFF ${user.id} rejecting order ${orderId}`);
+
+    // 1️⃣ Check if order exists
+    const order = await orderModel.getOrderById(orderId);
+    if (!order || order.length === 0) {
+      return response.error(res, ERROR.NOT_FOUND, "Order not found");
+    }
+
+    // 2️⃣ Check order status (only CONFIRMED can be rejected)
+    const orderStatus = order[0].status;
+    console.log(`[Order Reject] Order ${orderId}: current status = ${orderStatus}`);
+
+    if (orderStatus !== "CONFIRMED") {
+      return response.error(
+        res,
+        ERROR.BAD_REQUEST,
+        `Order can only be rejected in CONFIRMED status. Current status: ${orderStatus}`
+      );
+    }
+
+    // 3️⃣ Reject the order
+    const affected = await orderModel.rejectOrder(orderId, user.id);
+    if (!affected) {
+      return response.error(res, ERROR.BAD_REQUEST, "Failed to reject order");
+    }
+
+    console.log(`[Order Reject] ✅ Order rejected`);
+
+    // 4️⃣ Get updated order
+    const updatedOrder = await orderModel.getOrderById(orderId);
+    
+    const orderInfo = {
+      id: updatedOrder[0].id,
+      order_code: updatedOrder[0].order_code,
+      store_id: updatedOrder[0].store_id,
+      order_date: updatedOrder[0].order_date,
+      delivery_date: updatedOrder[0].delivery_date,
+      status: updatedOrder[0].status,
+      total_amount: updatedOrder[0].total_amount,
+      created_by: updatedOrder[0].created_by,
+      confirmed_by: updatedOrder[0].confirmed_by,
+      rejected_by: updatedOrder[0].rejected_by,
+      created_at: updatedOrder[0].created_at,
+      updated_at: updatedOrder[0].updated_at,
+      items: []
+    };
+
+    updatedOrder.forEach(row => {
+      if (row.order_item_id) {
+        orderInfo.items.push({
+          order_item_id: row.order_item_id,
+          product_id: row.product_id,
+          product_name: row.product_name,
+          quantity: row.quantity,
+          unit_price: row.unit_price,
+          total_price: row.total_price
+        });
+      }
+    });
+
+    return response.success(res, orderInfo, "Order rejected successfully");
+
+  } catch (err) {
+    console.error("[Order Reject] Error:", err);
     return response.error(res, ERROR.INTERNAL_ERROR, err.message);
   }
 };
