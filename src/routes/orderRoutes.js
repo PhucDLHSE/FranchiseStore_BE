@@ -117,7 +117,7 @@ const { requireRoles } = require("../middlewares/roleMiddleware");
  *                       example: "2026-03-15"
  *                     status:
  *                       type: string
-                       enum: [SUBMITTED, CONFIRMED, ISSUED, DELIVERED, CANCELLED, REJECTED]
+ *                       enum: [SUBMITTED, CONFIRMED, ISSUED, DELIVERED, CANCELLED, REJECTED]
  *                       example: SUBMITTED
  *                     total_amount:
  *                       type: number
