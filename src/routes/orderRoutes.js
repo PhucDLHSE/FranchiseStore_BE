@@ -210,7 +210,9 @@ router.post(
  *       - SUBMITTED: Order created by FR_STAFF
  *       - CONFIRMED: CK_STAFF confirmed the order
  *       - ISSUED: First Goods Issue completed (can have multiple Issues for partial delivery)
- *       - DELIVERED: All ordered items received (delivered_quantity >= total_quantity)       - REJECTED: CK_STAFF rejected the order (returns to FR_STAFF) *       - CANCELLED: Order cancelled by FR_STAFF/MANAGER
+ *       - DELIVERED: All ordered items received (delivered_quantity >= total_quantity)       
+ *       - REJECTED: CK_STAFF rejected the order (returns to FR_STAFF)
+ *       - CANCELLED: Order cancelled by FR_STAFF/MANAGER
  *     tags: [Orders]
  *     security:
  *       - bearerAuth: []
@@ -283,7 +285,7 @@ router.post(
 router.get(
   "/orders",
   verifyToken,
-  requireRoles(["FR_STAFF", "CK_STAFF", "MANAGER"]),
+  requireRoles(["FR_STAFF", "CK_STAFF", "MANAGER", "ADMIN"]),
   orderController.getAllOrders
 );
 
@@ -411,7 +413,7 @@ router.get(
 router.get(
   "/orders/:id",
   verifyToken,
-  requireRoles(["FR_STAFF", "MANAGER", "CK_STAFF"]),
+  requireRoles(["FR_STAFF", "MANAGER", "CK_STAFF", "ADMIN"]),
   orderController.getOrderDetail
 );
 
